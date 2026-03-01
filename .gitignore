@@ -1,0 +1,6 @@
+node_modules/
+.env
+lastseen-data.json
+monitor-data.json
+favorites.json
+profile-meta.json

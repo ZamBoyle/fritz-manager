@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fritz!Box Control Panel</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+      <div class="login-card">
+        <div class="logo">
+          <h1>Fritz!Box</h1>
+          <p>Control Panel</p>
+        </div>
+        <form id="login-form">
+          <div class="form-group">
+            <label for="host">Adresse Fritz!Box</label>
+            <input type="text" id="host" value="192.168.178.1" placeholder="192.168.178.1">
+          </div>
+          <div class="form-group">
+            <label for="username">Utilisateur</label>
+            <input type="text" id="username" placeholder="admin (optionnel)">
+          </div>
+          <div class="form-group">
+            <label for="password">Mot de passe</label>
+            <input type="password" id="password" placeholder="Mot de passe Fritz!Box" required>
+          </div>
+          <button type="submit" id="login-btn">Se connecter</button>
+          <p id="login-error" class="error hidden"></p>
+        </form>
+      </div>
+    </div>
+
+    <!-- Main Screen -->
+    <div id="main-screen" class="screen hidden">
+      <!-- Header -->
+      <header>
+        <div class="header-left">
+          <h1>Fritz!Box <span id="header-host"></span></h1>
+        </div>
+        <div class="header-right">
+          <span id="connection-status" class="status-badge connected">Connecté</span>
+          <button id="refresh-btn" class="btn-icon" title="Actualiser">&#x21bb;</button>
+          <button id="logout-btn" class="btn-icon" title="Déconnexion">&#x2716;</button>
+        </div>
+      </header>
+
+      <!-- Tabs -->
+      <nav class="tabs">
+        <button class="tab active" data-tab="devices">Appareils</button>
+        <button class="tab" data-tab="filters">Contrôle parental</button>
+        <button class="tab" data-tab="monitor">Monitoring</button>
+      </nav>
+
+      <!-- Devices Tab -->
+      <section id="tab-devices" class="tab-content active">
+        <div class="toolbar">
+          <div class="search-box">
+            <input type="text" id="device-search" placeholder="Rechercher un appareil...">
+          </div>
+          <div class="filter-buttons">
+            <button class="filter-btn active" data-filter="all">Tous</button>
+            <button class="filter-btn" data-filter="favorites">Favoris</button>
+            <button class="filter-btn" data-filter="online">En ligne</button>
+            <button class="filter-btn" data-filter="blocked">Bloqués</button>
+          </div>
+          <button class="btn-purge" onclick="removeAllOffline()">Supprimer les hors ligne</button>
+        </div>
+        <div id="devices-list" class="cards-grid">
+          <div class="loading">Chargement des appareils...</div>
+        </div>
+      </section>
+
+      <!-- Parental Controls Tab -->
+      <section id="tab-filters" class="tab-content">
+        <div class="sub-tabs">
+          <button class="sub-tab active" data-subtab="profiles" onclick="switchFilterSubTab('profiles')">Profils</button>
+          <button class="sub-tab" data-subtab="devices" onclick="switchFilterSubTab('devices')">Appareils</button>
+        </div>
+
+        <!-- Profiles Sub-View -->
+        <div id="subtab-profiles" class="subtab-content active">
+          <div class="toolbar">
+            <button class="btn-create-profile" onclick="openProfileEditor()">+ Nouveau profil</button>
+          </div>
+          <div id="profiles-grid" class="profiles-grid">
+            <div class="loading">Chargement des profils...</div>
+          </div>
+        </div>
+
+        <!-- Devices Sub-View (existing) -->
+        <div id="subtab-devices" class="subtab-content">
+          <div class="toolbar">
+            <div class="search-box">
+              <input type="text" id="filter-search" placeholder="Rechercher un appareil...">
+            </div>
+          </div>
+          <div id="filters-info" class="info-panel hidden"></div>
+          <div id="filters-list" class="cards-grid">
+            <div class="loading">Chargement du contrôle parental...</div>
+          </div>
+        </div>
+
+        <!-- Profile Editor Modal -->
+        <div id="profile-editor-modal" class="modal hidden">
+          <div class="modal-backdrop" onclick="closeProfileEditor()"></div>
+          <div class="modal-content profile-editor">
+            <div class="modal-header">
+              <h2 id="profile-editor-title">Modifier le profil</h2>
+              <button class="modal-close" onclick="closeProfileEditor()">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-section">
+                <label>Icône</label>
+                <div id="icon-picker" class="icon-picker"></div>
+              </div>
+              <div class="form-section">
+                <label for="profile-name">Nom du profil</label>
+                <input type="text" id="profile-name" class="form-input" maxlength="30" placeholder="Ex: Enfants, Tablette...">
+              </div>
+              <div class="form-section">
+                <label>Accès Internet</label>
+                <div class="radio-group" id="time-radios">
+                  <label class="radio-card"><input type="radio" name="profile-time" value="unlimited"> Illimité</label>
+                  <label class="radio-card"><input type="radio" name="profile-time" value="limited"> Horaires</label>
+                  <label class="radio-card"><input type="radio" name="profile-time" value="never"> Bloqué</label>
+                </div>
+              </div>
+              <div id="schedule-section" class="form-section hidden">
+                <label>Horaires autorisés <small>(cliquer pour basculer)</small></label>
+                <div id="schedule-grid" class="schedule-grid"></div>
+              </div>
+              <div class="form-section">
+                <label>Budget temps quotidien</label>
+                <div class="radio-group" id="budget-radios">
+                  <label class="radio-card"><input type="radio" name="profile-budget" value="unlimited"> Illimité</label>
+                  <label class="radio-card"><input type="radio" name="profile-budget" value="limited"> Limité</label>
+                </div>
+              </div>
+              <div id="budget-section" class="form-section hidden">
+                <div id="budget-days" class="budget-days-grid"></div>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="profile-share-budget"> Budget partagé entre les appareils
+                </label>
+              </div>
+              <div class="form-section">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="profile-parental" onchange="toggleFilterSection()"> Filtrage de sites web
+                </label>
+              </div>
+              <div id="filter-section" class="form-section hidden">
+                <div class="radio-group">
+                  <label class="radio-card"><input type="radio" name="profile-filtertype" value="black"> Liste noire (bloquer)</label>
+                  <label class="radio-card"><input type="radio" name="profile-filtertype" value="white"> Liste blanche (autoriser)</label>
+                </div>
+                <div id="website-list-section" class="website-list-section">
+                  <div class="website-list-header">
+                    <span id="website-list-title" class="website-list-title">Sites bloqués</span>
+                    <span id="website-list-count" class="website-list-count"></span>
+                  </div>
+                  <div class="website-add-row">
+                    <input type="text" id="website-add-input" class="form-input" placeholder="ex: tiktok.com" onkeydown="if(event.key==='Enter'){event.preventDefault();addWebsiteEntry()}">
+                    <button type="button" class="btn-add-website" onclick="addWebsiteEntry()">+ Ajouter</button>
+                  </div>
+                  <div id="website-list" class="website-list">
+                    <div class="loading-small">Chargement...</div>
+                  </div>
+                </div>
+              </div>
+              <div class="form-section">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="profile-disallow-guest"> Bloquer le réseau invité
+                </label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-secondary" onclick="closeProfileEditor()">Annuler</button>
+              <button class="btn-save" id="btn-save-profile" onclick="saveProfileForm()">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Monitoring Tab -->
+      <section id="tab-monitor" class="tab-content">
+        <div class="monitor-header">
+          <div class="monitor-controls">
+            <button id="monitor-toggle-btn" class="btn-monitor-start" onclick="toggleMonitor()">Démarrer le monitoring</button>
+            <span id="monitor-status-text" class="monitor-status-text">Arrêté</span>
+          </div>
+          <div class="monitor-filter">
+            <label for="monitor-profile-filter">Filtrer par profil :</label>
+            <select id="monitor-profile-filter" onchange="loadMonitorData()">
+              <option value="all">Tous les appareils</option>
+            </select>
+          </div>
+        </div>
+        <div id="monitor-summary" class="monitor-summary hidden"></div>
+        <div id="monitor-devices" class="cards-grid">
+          <div class="empty-state">Démarrez le monitoring pour suivre le temps en ligne des appareils</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container"></div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/devices.js"></script>
+  <script src="js/filters.js"></script>
+  <script src="js/profiles.js"></script>
+  <script src="js/monitor.js"></script>
+</body>
+</html>
