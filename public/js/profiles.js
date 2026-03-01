@@ -16,8 +16,8 @@ const PROFILE_ICONS = [
   { emoji: '\u{1F3AE}', label: 'Jeux' },
   { emoji: '\u{1F4F1}', label: 'Mobile' },
   { emoji: '\u{1F476}', label: 'Enfant' },
-  { emoji: '\u{1F4DA}', label: 'Ecole' },
-  { emoji: '\u{1F3AC}', label: 'Video' },
+  { emoji: '\u{1F4DA}', label: 'École' },
+  { emoji: '\u{1F3AC}', label: 'Vidéo' },
   { emoji: '\u{1F3E0}', label: 'Maison' },
   { emoji: '\u2B50', label: 'VIP' },
   { emoji: '\u{1F512}', label: 'Restreint' },
@@ -51,8 +51,8 @@ async function loadProfiles() {
   container.innerHTML = '<div class="loading">Chargement des profils...</div>';
   try {
     const [profilesRes, metaRes] = await Promise.all([
-      api('GET', '/api/profiles'),
-      api('GET', '/api/profiles/meta'),
+      api('GET', API.PROFILES),
+      api('GET', API.PROFILES_META),
     ]);
     profilesList = profilesRes.data;
     profilesMeta = metaRes.meta || {};
@@ -64,9 +64,9 @@ async function loadProfiles() {
 
 function buildProfileSummary(profile) {
   const parts = [];
-  if (profile.onlineTime === 'unlimited') parts.push('Acces illimite');
-  else if (profile.onlineTime === 'never' || profile.onlineTime === 'blocked') parts.push('Acces bloque');
-  else parts.push('Horaires limites');
+  if (profile.onlineTime === 'unlimited') parts.push('Accès illimité');
+  else if (profile.onlineTime === 'never' || profile.onlineTime === 'blocked') parts.push('Accès bloqué');
+  else parts.push('Horaires limités');
   if (profile.budget && profile.budget !== '\u2014' && profile.budget !== ' \u2014 ') parts.push('Budget: ' + profile.budget);
   if (profile.filter && profile.filter !== '\u2014' && profile.filter !== ' \u2014 ') parts.push(profile.filter);
   return parts.join(' \u00B7 ');
@@ -112,7 +112,7 @@ async function openProfileEditor(profileId = null) {
     modal.classList.remove('hidden');
     document.querySelector('.modal-body').innerHTML = '<div class="loading">Chargement...</div>';
     try {
-      const res = await api('GET', `/api/profiles/${profileId}`);
+      const res = await api('GET', API.PROFILE(profileId));
       editingProfile = res.data;
       rebuildModalBody();
       populateProfileForm(editingProfile);
@@ -272,7 +272,7 @@ async function loadWebsiteList() {
   if (!listEl) return;
 
   const filterType = document.querySelector('input[name="profile-filtertype"]:checked')?.value || 'black';
-  titleEl.textContent = filterType === 'black' ? 'Sites bloques' : 'Sites autorises';
+  titleEl.textContent = filterType === 'black' ? 'Sites bloqués' : 'Sites autorisés';
 
   if (_websiteListCache[filterType]) {
     renderWebsiteList(_websiteListCache[filterType], filterType);
@@ -282,7 +282,7 @@ async function loadWebsiteList() {
   listEl.innerHTML = '<div class="loading-small">Chargement...</div>';
   countEl.textContent = '';
   try {
-    const res = await api('GET', `/api/profiles/websites/${filterType}`);
+    const res = await api('GET', API.PROFILES_WEBSITES(filterType));
     const data = res.data || { list: [] };
     _websiteListCache[filterType] = data;
     renderWebsiteList(data, filterType);
@@ -299,7 +299,7 @@ function renderWebsiteList(data, filterType) {
   countEl.textContent = urls.length > 0 ? `(${urls.length})` : '';
 
   if (urls.length === 0) {
-    listEl.innerHTML = `<div class="website-list-empty">${filterType === 'black' ? 'Aucun site bloque' : 'Aucun site autorise'}</div>`;
+    listEl.innerHTML = `<div class="website-list-empty">${filterType === 'black' ? 'Aucun site bloqué' : 'Aucun site autorisé'}</div>`;
     return;
   }
 
@@ -324,7 +324,7 @@ async function addWebsiteEntry() {
   const cached = _websiteListCache[filterType];
   const currentUrls = (cached?.list || []).map(e => e.url);
   if (currentUrls.includes(url)) {
-    showToast('Ce site est deja dans la liste', 'error');
+    showToast('Ce site est déjà dans la liste', 'error');
     return;
   }
 
@@ -332,11 +332,11 @@ async function addWebsiteEntry() {
   input.disabled = true;
 
   try {
-    await api('PUT', `/api/profiles/websites/${filterType}`, { urls: newUrls });
+    await api('PUT', API.PROFILES_WEBSITES(filterType), { urls: newUrls });
     input.value = '';
     delete _websiteListCache[filterType];
     await loadWebsiteList();
-    showToast(`${url} ajoute`, 'success');
+    showToast(`${url} ajouté`, 'success');
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
   } finally {
@@ -355,10 +355,10 @@ async function removeWebsiteEntry(url) {
   const newUrls = currentUrls.filter(u => u !== url);
 
   try {
-    await api('PUT', `/api/profiles/websites/${filterType}`, { urls: newUrls });
+    await api('PUT', API.PROFILES_WEBSITES(filterType), { urls: newUrls });
     delete _websiteListCache[filterType];
     await loadWebsiteList();
-    showToast(`${url} supprime`, 'success');
+    showToast(`${url} supprimé`, 'success');
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
   } finally {
@@ -570,19 +570,19 @@ async function saveProfileForm() {
 
     let savedId;
     if (editingProfile) {
-      await api('PUT', `/api/profiles/${editingProfile.id}`, formData);
+      await api('PUT', API.PROFILE(editingProfile.id), formData);
       savedId = editingProfile.id;
     } else {
-      const res = await api('POST', '/api/profiles', formData);
+      const res = await api('POST', API.PROFILES, formData);
       savedId = res.id;
     }
 
     if (savedId && _selectedProfileIcon) {
       profilesMeta[savedId] = { icon: _selectedProfileIcon };
-      await api('POST', '/api/profiles/meta', { meta: profilesMeta });
+      await api('POST', API.PROFILES_META, { meta: profilesMeta });
     }
 
-    showToast(editingProfile ? 'Profil modifie' : 'Profil cree', 'success');
+    showToast(editingProfile ? 'Profil modifié' : 'Profil créé', 'success');
     closeProfileEditor();
     state.filters = null;
     await loadProfiles();
@@ -599,13 +599,13 @@ async function saveProfileForm() {
 let _deleteProfilePending = false;
 async function deleteProfile(profileId, name) {
   if (_deleteProfilePending) return;
-  if (!confirm(`Supprimer le profil "${name}" ?\nLes appareils seront reassignes au profil Standard.`)) return;
+  if (!confirm(`Supprimer le profil "${name}" ?\nLes appareils seront réassignés au profil Standard.`)) return;
   _deleteProfilePending = true;
   try {
-    await api('DELETE', `/api/profiles/${profileId}`);
+    await api('DELETE', API.PROFILE(profileId));
     delete profilesMeta[profileId];
-    await api('POST', '/api/profiles/meta', { meta: profilesMeta });
-    showToast(`Profil "${name}" supprime`, 'success');
+    await api('POST', API.PROFILES_META, { meta: profilesMeta });
+    showToast(`Profil "${name}" supprimé`, 'success');
     state.filters = null;
     await loadProfiles();
   } catch (err) {

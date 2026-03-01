@@ -8,7 +8,7 @@ let _favorites = new Set();
 
 async function loadFavorites() {
   try {
-    const data = await api('GET', '/api/favorites');
+    const data = await api('GET', API.FAVORITES);
     _favorites = new Set(data.favorites || []);
   } catch {
     _favorites = new Set();
@@ -27,7 +27,7 @@ async function toggleFavorite(mac) {
   if (_favorites.has(mac)) _favorites.delete(mac);
   else _favorites.add(mac);
   renderDevices();
-  await api('POST', '/api/favorites', { favorites: [..._favorites] });
+  await api('POST', API.FAVORITES, { favorites: [..._favorites] });
 }
 
 async function loadDevices() {
@@ -35,7 +35,7 @@ async function loadDevices() {
   container.innerHTML = '<div class="loading">Chargement des appareils...</div>';
 
   try {
-    const [data] = await Promise.all([api('GET', '/api/devices'), loadFavorites()]);
+    const [data] = await Promise.all([api('GET', API.DEVICES), loadFavorites()]);
     state.devices = data.devices;
     renderDevices();
 
@@ -50,7 +50,7 @@ async function loadWanStatusInBackground() {
   const activeDevices = state.devices.filter(d => d.active && d.ip);
   for (const device of activeDevices) {
     try {
-      const res = await fetch(`/api/devices/${encodeURIComponent(device.ip)}/status`);
+      const res = await fetch(API.DEVICE_STATUS(device.ip));
       const data = await res.json();
       if (data.success) {
         device.blocked = data.blocked;
@@ -139,33 +139,18 @@ function renderDevices() {
   }).join('');
 }
 
-async function blockDevice(ip) {
-  const btn = document.querySelector(`[data-ip="${ip}"] .btn-block`);
-  if (btn) btn.disabled = true;
-
-  try {
-    await api('POST', `/api/devices/${encodeURIComponent(ip)}/block`);
-    showToast(`Appareil ${ip} bloqué`, 'success');
+async function setDeviceBlocked(ip, block) {
+  const selector = block ? '.btn-block' : '.btn-unblock';
+  const btn = document.querySelector(`[data-ip="${ip}"] ${selector}`);
+  await withBtnGuard(btn, async () => {
+    await api('POST', block ? API.DEVICE_BLOCK(ip) : API.DEVICE_UNBLOCK(ip));
+    showToast(`Appareil ${ip} ${block ? 'bloqué' : 'débloqué'}`, 'success');
     await loadDevices();
-  } catch (err) {
-    showToast(`Erreur: ${err.message}`, 'error');
-    if (btn) btn.disabled = false;
-  }
+  });
 }
 
-async function unblockDevice(ip) {
-  const btn = document.querySelector(`[data-ip="${ip}"] .btn-unblock`);
-  if (btn) btn.disabled = true;
-
-  try {
-    await api('POST', `/api/devices/${encodeURIComponent(ip)}/unblock`);
-    showToast(`Appareil ${ip} débloqué`, 'success');
-    await loadDevices();
-  } catch (err) {
-    showToast(`Erreur: ${err.message}`, 'error');
-    if (btn) btn.disabled = false;
-  }
-}
+function blockDevice(ip) { return setDeviceBlocked(ip, true); }
+function unblockDevice(ip) { return setDeviceBlocked(ip, false); }
 
 function formatLastSeen(ts) {
   const diff = Date.now() - ts;
@@ -196,7 +181,7 @@ async function removeAllOffline() {
   }
 
   try {
-    const result = await api('POST', '/api/devices/cleanup');
+    const result = await api('POST', API.DEVICES_CLEANUP);
     state.filters = null;
     showToast(`${result.removed} appareil(s) supprimé(s) (${result.countBefore} → ${result.countAfter})`, 'success');
   } catch (err) {
@@ -218,7 +203,7 @@ async function removeDevice(name, mac) {
 
   _removeDevicePending = true;
   try {
-    await api('POST', '/api/devices/remove', { name, mac });
+    await api('POST', API.DEVICES_REMOVE, { name, mac });
     showToast(`Appareil "${name}" supprimé`, 'success');
     state.filters = null;
     await loadDevices();

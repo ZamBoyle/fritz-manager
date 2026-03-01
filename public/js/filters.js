@@ -29,7 +29,7 @@ async function loadFilters(forceRefresh = false) {
   container.innerHTML = '<div class="loading">Chargement du contrôle parental...</div>';
   infoPanel.classList.add('hidden');
 
-  _filtersLoading = api('GET', '/api/filters').then(res => {
+  _filtersLoading = api('GET', API.FILTERS).then(res => {
     state.filters = res.data;
   });
 
@@ -105,16 +105,11 @@ function renderFilters() {
 async function toggleKidBlock(uid, block) {
   const card = document.querySelector(`[data-uid="${uid}"]`);
   const btn = card?.querySelector('.btn-block, .btn-unblock');
-  if (btn) btn.disabled = true;
-
-  try {
-    await api('POST', '/api/filters/block', { uid, blocked: block });
+  await withBtnGuard(btn, async () => {
+    await api('POST', API.FILTERS_BLOCK, { uid, blocked: block });
     showToast(`Appareil ${block ? 'bloqué' : 'débloqué'}`, 'success');
     await loadFilters(true);
-  } catch (err) {
-    showToast(`Erreur: ${err.message}`, 'error');
-    if (btn) btn.disabled = false;
-  }
+  });
 }
 
 let _changeProfilePending = false;
@@ -122,7 +117,7 @@ async function changeProfile(uid, profileId) {
   if (_changeProfilePending) return;
   _changeProfilePending = true;
   try {
-    await api('POST', '/api/filters/profile', { uid, profileId });
+    await api('POST', API.FILTERS_PROFILE, { uid, profileId });
     showToast('Profil modifié', 'success');
     await loadFilters(true);
   } catch (err) {

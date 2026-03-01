@@ -8,6 +8,29 @@ const state = {
   filters: null,
 };
 
+// === API endpoints ===
+const API = {
+  LOGIN: '/api/login',
+  LOGOUT: '/api/logout',
+  DEVICES: '/api/devices',
+  DEVICE_STATUS: (ip) => `/api/devices/${encodeURIComponent(ip)}/status`,
+  DEVICE_BLOCK: (ip) => `/api/devices/${encodeURIComponent(ip)}/block`,
+  DEVICE_UNBLOCK: (ip) => `/api/devices/${encodeURIComponent(ip)}/unblock`,
+  DEVICES_CLEANUP: '/api/devices/cleanup',
+  DEVICES_REMOVE: '/api/devices/remove',
+  FAVORITES: '/api/favorites',
+  FILTERS: '/api/filters',
+  FILTERS_BLOCK: '/api/filters/block',
+  FILTERS_PROFILE: '/api/filters/profile',
+  PROFILES: '/api/profiles',
+  PROFILES_META: '/api/profiles/meta',
+  PROFILE: (id) => `/api/profiles/${encodeURIComponent(id)}`,
+  PROFILES_WEBSITES: (type) => `/api/profiles/websites/${encodeURIComponent(type)}`,
+  MONITOR_STATUS: '/api/monitor/status',
+  MONITOR_START: '/api/monitor/start',
+  MONITOR_STOP: '/api/monitor/stop',
+};
+
 // === API helper ===
 async function api(method, url, body = null) {
   const controller = new AbortController();
@@ -35,6 +58,17 @@ async function api(method, url, body = null) {
     throw new Error(data.error || `Request failed (${res.status})`);
   }
   return data;
+}
+
+// === Shared action guard (disable btn, catch → toast error, re-enable) ===
+async function withBtnGuard(btn, fn) {
+  if (btn) btn.disabled = true;
+  try {
+    await fn();
+  } catch (err) {
+    showToast(`Erreur: ${err.message}`, 'error');
+    if (btn) btn.disabled = false;
+  }
 }
 
 // === Toast notifications ===
@@ -82,7 +116,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
-    await api('POST', '/api/login', { host, username, password });
+    await api('POST', API.LOGIN, { host, username, password });
 
     state.connected = true;
     document.getElementById('header-host').textContent = host;
@@ -122,7 +156,7 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   cleanupMonitor();
 
   // Server-side cleanup (stop monitor, clear session)
-  try { await api('POST', '/api/logout'); } catch { /* ignore */ }
+  try { await api('POST', API.LOGOUT); } catch { /* ignore */ }
 
   state.connected = false;
   state.devices = [];
@@ -136,6 +170,8 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 
 // Expose shared API for other modules
 window.state = state;
+window.API = API;
 window.api = api;
 window.showToast = showToast;
+window.withBtnGuard = withBtnGuard;
 })();

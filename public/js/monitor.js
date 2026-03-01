@@ -6,7 +6,7 @@ let _monitorPolling = false;
 
 async function loadMonitorData() {
   try {
-    const res = await api('GET', '/api/monitor/status');
+    const res = await api('GET', API.MONITOR_STATUS);
     const data = res.data;
 
     updateMonitorUI(data);
@@ -26,7 +26,7 @@ async function loadMonitorData() {
         if (_monitorPolling) return;
         _monitorPolling = true;
         try {
-          const r = await api('GET', '/api/monitor/status');
+          const r = await api('GET', API.MONITOR_STATUS);
           updateMonitorUI(r.data);
         } catch (e) { /* ignore */ }
         finally { _monitorPolling = false; }
@@ -175,11 +175,11 @@ async function toggleMonitor() {
 
   try {
     if (isRunning) {
-      await api('POST', '/api/monitor/stop');
+      await api('POST', API.MONITOR_STOP);
       showToast('Monitoring arrêté', 'info');
       clearInterval(monitorRefreshTimer);
     } else {
-      await api('POST', '/api/monitor/start');
+      await api('POST', API.MONITOR_START);
       showToast('Monitoring démarré', 'success');
     }
     await loadMonitorData();
@@ -211,7 +211,7 @@ async function populateProfileFilter() {
         select.appendChild(opt);
       });
     } else {
-      const res = await api('GET', '/api/filters');
+      const res = await api('GET', API.FILTERS);
       if (res.data && res.data.profiles) {
         res.data.profiles.forEach(p => {
           const opt = document.createElement('option');
