@@ -6,6 +6,8 @@ let editingProfile = null;
 let _scheduleState = null;
 let _scheduleMouseDown = false;
 let _schedulePaintMode = null;
+let _scheduleAbort = null; // AbortController for schedule grid listeners
+let _selectedProfileIcon = null;
 const _originalModalBodyHtml = document.querySelector('#profile-editor-modal .modal-body')?.innerHTML || '';
 
 const PROFILE_ICONS = [
@@ -55,7 +57,7 @@ async function loadProfiles() {
     profilesMeta = metaRes.meta || {};
     renderProfileCards();
   } catch (err) {
-    container.innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+    container.innerHTML = `<div class="empty-state">Erreur : ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -139,6 +141,7 @@ function closeProfileEditor() {
   editingProfile = null;
   _scheduleState = null;
   _websiteListCache = {};
+  if (_scheduleAbort) { _scheduleAbort.abort(); _scheduleAbort = null; }
 }
 
 function populateProfileForm(data) {
@@ -218,7 +221,7 @@ function renderIconPicker() {
   const currentIcon = editingProfile
     ? (profilesMeta[editingProfile.id]?.icon || getDefaultIcon(editingProfile))
     : PROFILE_ICONS[0].emoji;
-  window._selectedIcon = currentIcon;
+  _selectedProfileIcon = currentIcon;
 
   picker.innerHTML = PROFILE_ICONS.map(({ emoji, label }) => `
     <button type="button" class="icon-option${emoji === currentIcon ? ' selected' : ''}"
@@ -229,7 +232,7 @@ function renderIconPicker() {
 function selectIcon(btn, emoji) {
   document.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
-  window._selectedIcon = emoji;
+  _selectedProfileIcon = emoji;
 }
 
 // === Website List ===
@@ -407,14 +410,19 @@ function renderScheduleGrid() {
 
   grid.innerHTML = html;
 
+  // Clean up previous listeners before adding new ones
+  if (_scheduleAbort) _scheduleAbort.abort();
+  _scheduleAbort = new AbortController();
+  const signal = _scheduleAbort.signal;
+
   // Drag-to-paint support
-  grid.addEventListener('mousedown', onScheduleMouseDown);
-  grid.addEventListener('mouseover', onScheduleMouseOver);
-  document.addEventListener('mouseup', onScheduleMouseUp);
+  grid.addEventListener('mousedown', onScheduleMouseDown, { signal });
+  grid.addEventListener('mouseover', onScheduleMouseOver, { signal });
+  document.addEventListener('mouseup', onScheduleMouseUp, { signal });
   // Touch support
-  grid.addEventListener('touchstart', onScheduleTouchStart, { passive: false });
-  grid.addEventListener('touchmove', onScheduleTouchMove, { passive: false });
-  grid.addEventListener('touchend', onScheduleMouseUp);
+  grid.addEventListener('touchstart', onScheduleTouchStart, { passive: false, signal });
+  grid.addEventListener('touchmove', onScheduleTouchMove, { passive: false, signal });
+  grid.addEventListener('touchend', onScheduleMouseUp, { signal });
 }
 
 function onScheduleMouseDown(e) {
@@ -546,8 +554,8 @@ async function saveProfileForm() {
     }
 
     // Save icon metadata
-    if (savedId && window._selectedIcon) {
-      profilesMeta[savedId] = { icon: window._selectedIcon };
+    if (savedId && _selectedProfileIcon) {
+      profilesMeta[savedId] = { icon: _selectedProfileIcon };
       await api('POST', '/api/profiles/meta', { meta: profilesMeta });
     }
 

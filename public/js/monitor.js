@@ -1,6 +1,7 @@
 // === Monitoring management ===
 
 let monitorRefreshTimer = null;
+let _monitorPolling = false;
 
 async function loadMonitorData() {
   try {
@@ -21,15 +22,18 @@ async function loadMonitorData() {
           clearInterval(monitorRefreshTimer);
           return;
         }
+        if (_monitorPolling) return; // Skip if previous poll still in flight
+        _monitorPolling = true;
         try {
           const r = await api('GET', '/api/monitor/status');
           updateMonitorUI(r.data);
         } catch (e) { /* ignore */ }
+        finally { _monitorPolling = false; }
       }, 15000);
     }
   } catch (err) {
     document.getElementById('monitor-devices').innerHTML =
-      `<div class="empty-state">Erreur : ${err.message}</div>`;
+      `<div class="empty-state">Erreur : ${escapeHtml(err.message)}</div>`;
   }
 }
 

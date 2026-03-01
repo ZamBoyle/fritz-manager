@@ -20,7 +20,7 @@ async function loadFilters(forceRefresh = false) {
       await _filtersLoading;
       renderFilters();
     } catch (err) {
-      container.innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+      container.innerHTML = `<div class="empty-state">Erreur : ${escapeHtml(err.message)}</div>`;
     }
     return;
   }
@@ -36,7 +36,7 @@ async function loadFilters(forceRefresh = false) {
     await _filtersLoading;
     renderFilters();
   } catch (err) {
-    container.innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+    container.innerHTML = `<div class="empty-state">Erreur : ${escapeHtml(err.message)}</div>`;
   } finally {
     _filtersLoading = null;
   }

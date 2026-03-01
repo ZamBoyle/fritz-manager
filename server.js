@@ -17,6 +17,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Auth guard: all /api/* routes except login and status require a valid session
+app.use('/api', (req, res, next) => {
+  const openRoutes = ['/login', '/logout', '/status'];
+  if (openRoutes.includes(req.path)) return next();
+  if (!fritzAuth || !fritzAuth.isSessionValid()) {
+    return res.status(401).json({ success: false, error: 'Not connected' });
+  }
+  next();
+});
+
 // Fritz!Box instances (initialized on login)
 let fritzAuth = null;
 let fritzHosts = null;
@@ -60,17 +70,21 @@ app.get('/api/status', (req, res) => {
 
 // === Devices API ===
 
+// POST /api/logout - Disconnect and clean up
+app.post('/api/logout', (req, res) => {
+  if (fritzMonitor) fritzMonitor.stop();
+  fritzAuth = null;
+  fritzHosts = null;
+  fritzFilter = null;
+  fritzMonitor = null;
+  console.log('[Server] Session closed');
+  res.json({ success: true });
+});
+
 // GET /api/devices
 app.get('/api/devices', async (req, res) => {
-  if (!fritzHosts) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
-    console.log('[Devices] Loading device list...');
     const hosts = await fritzHosts.getHostListXml();
-    console.log(`[Devices] Found ${hosts.length} devices`);
-
-    // Return devices without WAN status (too slow per-device)
-    // WAN status is fetched on-demand via /api/devices/:ip/status
     res.json({ success: true, devices: hosts.map(h => ({ ...h, blocked: false })) });
   } catch (err) {
     console.error('[Devices] Error:', err.message);
@@ -80,8 +94,6 @@ app.get('/api/devices', async (req, res) => {
 
 // GET /api/devices/:ip/status - Get WAN access status for one device
 app.get('/api/devices/:ip/status', async (req, res) => {
-  if (!fritzHosts) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
     const access = await fritzHosts.getWANAccessByIP(req.params.ip);
     res.json({ success: true, blocked: access.disallowed });
@@ -92,8 +104,6 @@ app.get('/api/devices/:ip/status', async (req, res) => {
 
 // POST /api/devices/:ip/block
 app.post('/api/devices/:ip/block', async (req, res) => {
-  if (!fritzHosts) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
     await fritzHosts.disallowWANAccess(req.params.ip);
     res.json({ success: true, message: `Device ${req.params.ip} blocked` });
@@ -105,8 +115,6 @@ app.post('/api/devices/:ip/block', async (req, res) => {
 
 // POST /api/devices/:ip/unblock
 app.post('/api/devices/:ip/unblock', async (req, res) => {
-  if (!fritzHosts) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
     await fritzHosts.allowWANAccess(req.params.ip);
     res.json({ success: true, message: `Device ${req.params.ip} unblocked` });
@@ -118,23 +126,8 @@ app.post('/api/devices/:ip/unblock', async (req, res) => {
 
 // === Filters API ===
 
-// GET /api/filters/debug/:page - Debug: see raw data.lua response for any page
-app.get('/api/filters/debug/:page', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
-
-  try {
-    const raw = await fritzFilter.debugPage(req.params.page);
-    res.json({ success: true, page: req.params.page, raw });
-  } catch (err) {
-    console.error('[Filters] Debug error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // GET /api/filters - Get parental controls data
 app.get('/api/filters', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
     const result = await fritzFilter.getParentalControls();
     res.json({ success: true, data: result });
@@ -146,8 +139,6 @@ app.get('/api/filters', async (req, res) => {
 
 // POST /api/filters/block - Block/unblock a device via parental controls
 app.post('/api/filters/block', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
     const { uid, blocked } = req.body;
     if (!uid) return res.status(400).json({ success: false, error: 'uid is required' });
@@ -161,8 +152,6 @@ app.post('/api/filters/block', async (req, res) => {
 
 // POST /api/filters/profile - Change access profile for a device
 app.post('/api/filters/profile', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
     const { uid, profileId } = req.body;
     if (!uid || !profileId) return res.status(400).json({ success: false, error: 'uid and profileId are required' });
@@ -176,8 +165,6 @@ app.post('/api/filters/profile', async (req, res) => {
 
 // POST /api/devices/remove - Remove a device from Fritz!Box
 app.post('/api/devices/remove', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
     const { name, mac } = req.body;
     if (!name) return res.status(400).json({ success: false, error: 'Device name is required' });
@@ -191,8 +178,6 @@ app.post('/api/devices/remove', async (req, res) => {
 
 // POST /api/devices/cleanup - Remove all inactive devices (Fritz!Box built-in cleanup)
 app.post('/api/devices/cleanup', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
-
   try {
     const result = await fritzFilter.cleanupDevices();
     res.json({ success: true, ...result });
@@ -222,7 +207,9 @@ app.post('/api/profiles/meta', (req, res) => {
 });
 
 app.get('/api/profiles/websites/:type', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
+  if (req.params.type !== 'black' && req.params.type !== 'white') {
+    return res.status(400).json({ success: false, error: 'type must be "black" or "white"' });
+  }
   try {
     const data = await fritzFilter.getWebsiteList(req.params.type);
     res.json({ success: true, data });
@@ -230,7 +217,9 @@ app.get('/api/profiles/websites/:type', async (req, res) => {
 });
 
 app.put('/api/profiles/websites/:type', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
+  if (req.params.type !== 'black' && req.params.type !== 'white') {
+    return res.status(400).json({ success: false, error: 'type must be "black" or "white"' });
+  }
   try {
     const { urls } = req.body;
     if (!Array.isArray(urls)) return res.status(400).json({ success: false, error: 'urls must be an array' });
@@ -241,7 +230,6 @@ app.put('/api/profiles/websites/:type', async (req, res) => {
 
 // CRUD routes
 app.get('/api/profiles', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
   try {
     const data = await fritzFilter.getProfiles();
     res.json({ success: true, data });
@@ -249,7 +237,6 @@ app.get('/api/profiles', async (req, res) => {
 });
 
 app.get('/api/profiles/:id', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
   try {
     const data = await fritzFilter.getProfileDetails(req.params.id);
     res.json({ success: true, data });
@@ -257,7 +244,6 @@ app.get('/api/profiles/:id', async (req, res) => {
 });
 
 app.post('/api/profiles', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
   try {
     const newId = await fritzFilter.saveProfile(null, req.body);
     res.json({ success: true, id: newId });
@@ -265,7 +251,6 @@ app.post('/api/profiles', async (req, res) => {
 });
 
 app.put('/api/profiles/:id', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
   try {
     await fritzFilter.saveProfile(req.params.id, req.body);
     res.json({ success: true });
@@ -273,7 +258,6 @@ app.put('/api/profiles/:id', async (req, res) => {
 });
 
 app.delete('/api/profiles/:id', async (req, res) => {
-  if (!fritzFilter) return res.status(401).json({ success: false, error: 'Not connected' });
   try {
     await fritzFilter.deleteProfile(req.params.id);
     res.json({ success: true });
@@ -309,40 +293,30 @@ app.post('/api/favorites', (req, res) => {
 
 // POST /api/monitor/start - Start monitoring
 app.post('/api/monitor/start', (req, res) => {
-  if (!fritzMonitor) return res.status(401).json({ success: false, error: 'Not connected' });
-
   fritzMonitor.start();
   res.json({ success: true, message: 'Monitor started' });
 });
 
 // POST /api/monitor/stop - Stop monitoring
 app.post('/api/monitor/stop', (req, res) => {
-  if (!fritzMonitor) return res.status(401).json({ success: false, error: 'Not connected' });
-
   fritzMonitor.stop();
   res.json({ success: true, message: 'Monitor stopped' });
 });
 
 // GET /api/monitor/status - Get monitoring data
 app.get('/api/monitor/status', (req, res) => {
-  if (!fritzMonitor) return res.status(401).json({ success: false, error: 'Not connected' });
-
   const status = fritzMonitor.getStatus();
   res.json({ success: true, data: status });
 });
 
 // GET /api/monitor/profile/:profileId - Get monitoring data for a specific profile
 app.get('/api/monitor/profile/:profileId', (req, res) => {
-  if (!fritzMonitor) return res.status(401).json({ success: false, error: 'Not connected' });
-
   const status = fritzMonitor.getProfileStats(req.params.profileId);
   res.json({ success: true, data: status });
 });
 
 // POST /api/monitor/reset - Reset monitoring data
 app.post('/api/monitor/reset', (req, res) => {
-  if (!fritzMonitor) return res.status(401).json({ success: false, error: 'Not connected' });
-
   fritzMonitor.resetData();
   res.json({ success: true, message: 'Monitor data reset' });
 });

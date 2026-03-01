@@ -102,7 +102,16 @@ document.getElementById('refresh-btn').addEventListener('click', () => {
 });
 
 // === Logout ===
-document.getElementById('logout-btn').addEventListener('click', () => {
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  // Clear monitor auto-refresh timer
+  if (typeof monitorRefreshTimer !== 'undefined' && monitorRefreshTimer) {
+    clearInterval(monitorRefreshTimer);
+    monitorRefreshTimer = null;
+  }
+
+  // Server-side cleanup (stop monitor, clear session)
+  try { await api('POST', '/api/logout'); } catch { /* ignore */ }
+
   state.connected = false;
   state.devices = [];
   state.filters = null;

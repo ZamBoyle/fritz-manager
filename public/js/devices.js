@@ -41,7 +41,7 @@ async function loadDevices() {
     // Load WAN access status in background for active devices
     loadWanStatusInBackground();
   } catch (err) {
-    container.innerHTML = `<div class="empty-state">Erreur : ${err.message}</div>`;
+    container.innerHTML = `<div class="empty-state">Erreur : ${escapeHtml(err.message)}</div>`;
   }
 }
 
