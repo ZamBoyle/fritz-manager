@@ -7,15 +7,27 @@ const state = {
 
 // === API helper ===
 async function api(method, url, body = null) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
   };
   if (body) opts.body = JSON.stringify(body);
 
-  const res = await fetch(url, opts);
-  const data = await res.json();
+  let res;
+  try {
+    res = await fetch(url, opts);
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') throw new Error('Requete expirée (timeout)');
+    throw err;
+  }
+  clearTimeout(timeout);
 
+  const data = await res.json();
   if (!res.ok || !data.success) {
     throw new Error(data.error || `Request failed (${res.status})`);
   }

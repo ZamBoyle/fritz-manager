@@ -116,7 +116,10 @@ async function toggleKidBlock(uid, block) {
   }
 }
 
+let _changeProfilePending = false;
 async function changeProfile(uid, profileId) {
+  if (_changeProfilePending) return;
+  _changeProfilePending = true;
   try {
     await api('POST', '/api/filters/profile', { uid, profileId });
     showToast('Profil modifié', 'success');
@@ -124,6 +127,8 @@ async function changeProfile(uid, profileId) {
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
     await loadFilters(true);
+  } finally {
+    _changeProfilePending = false;
   }
 }
 

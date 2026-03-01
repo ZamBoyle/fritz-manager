@@ -82,7 +82,7 @@ function renderProfileCards() {
     return `
       <div class="profile-card${profile.deletable ? ' custom' : ' system'}" data-profile-id="${escapeAttr(profile.id)}">
         <div class="profile-card-header">
-          <div class="profile-card-icon">${icon}</div>
+          <div class="profile-card-icon">${escapeHtml(icon)}</div>
           <div class="profile-card-info">
             <div class="profile-card-name">${escapeHtml(profile.name)}</div>
             <div class="profile-card-summary">${escapeHtml(summary)}</div>
@@ -205,6 +205,13 @@ function toggleFilterSection() {
   updateFormSections();
 }
 
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !document.getElementById('profile-editor-modal').classList.contains('hidden')) {
+    closeProfileEditor();
+  }
+});
+
 // Listen for radio changes to show/hide sections and reload website list
 document.addEventListener('change', (e) => {
   if (e.target.name === 'profile-time' || e.target.name === 'profile-budget') {
@@ -321,7 +328,10 @@ async function addWebsiteEntry() {
   }
 }
 
+let _removeWebsitePending = false;
 async function removeWebsiteEntry(url) {
+  if (_removeWebsitePending) return;
+  _removeWebsitePending = true;
   const filterType = document.querySelector('input[name="profile-filtertype"]:checked')?.value || 'black';
   const cached = _websiteListCache[filterType];
   const currentUrls = (cached?.list || []).map(e => e.url);
@@ -334,6 +344,8 @@ async function removeWebsiteEntry(url) {
     showToast(`${url} supprime`, 'success');
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
+  } finally {
+    _removeWebsitePending = false;
   }
 }
 
@@ -573,8 +585,11 @@ async function saveProfileForm() {
 
 // === Delete Profile ===
 
+let _deleteProfilePending = false;
 async function deleteProfile(profileId, name) {
+  if (_deleteProfilePending) return;
   if (!confirm(`Supprimer le profil "${name}" ?\nLes appareils seront reassignes au profil Standard.`)) return;
+  _deleteProfilePending = true;
   try {
     await api('DELETE', `/api/profiles/${profileId}`);
     delete profilesMeta[profileId];
@@ -584,5 +599,7 @@ async function deleteProfile(profileId, name) {
     await loadProfiles();
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
+  } finally {
+    _deleteProfilePending = false;
   }
 }

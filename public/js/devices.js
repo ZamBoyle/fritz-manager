@@ -119,7 +119,7 @@ function renderDevices() {
           <div class="device-details">
             <span>IP: ${escapeHtml(device.ip)}</span>
             <span>MAC: ${escapeHtml(device.mac)}</span>
-            <span>${connType}</span>
+            <span>${escapeHtml(connType)}</span>
             ${device.speed && device.speed !== '0' ? `<span>${device.speed} Mbit/s</span>` : ''}
             ${device.blocked ? '<span style="color:var(--danger)">BLOQUE</span>' : ''}
           </div>
@@ -210,16 +210,21 @@ async function removeAllOffline() {
   await loadDevices();
 }
 
+let _removeDevicePending = false;
 async function removeDevice(name, mac) {
+  if (_removeDevicePending) return;
   if (!confirm(`Supprimer l'appareil "${name}" (${mac}) de la Fritz!Box ?`)) return;
 
+  _removeDevicePending = true;
   try {
     await api('POST', '/api/devices/remove', { name, mac });
     showToast(`Appareil "${name}" supprimé`, 'success');
-    state.filters = null; // Invalidate filters cache
+    state.filters = null;
     await loadDevices();
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
+  } finally {
+    _removeDevicePending = false;
   }
 }
 

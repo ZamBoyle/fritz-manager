@@ -291,32 +291,38 @@ app.post('/api/favorites', (req, res) => {
 
 // === Monitor API ===
 
+// Monitor guard helper (fritzMonitor can be null after logout race)
+function requireMonitor(req, res, next) {
+  if (!fritzMonitor) return res.status(400).json({ success: false, error: 'Monitor not initialized' });
+  next();
+}
+
 // POST /api/monitor/start - Start monitoring
-app.post('/api/monitor/start', (req, res) => {
+app.post('/api/monitor/start', requireMonitor, (req, res) => {
   fritzMonitor.start();
   res.json({ success: true, message: 'Monitor started' });
 });
 
 // POST /api/monitor/stop - Stop monitoring
-app.post('/api/monitor/stop', (req, res) => {
+app.post('/api/monitor/stop', requireMonitor, (req, res) => {
   fritzMonitor.stop();
   res.json({ success: true, message: 'Monitor stopped' });
 });
 
 // GET /api/monitor/status - Get monitoring data
-app.get('/api/monitor/status', (req, res) => {
+app.get('/api/monitor/status', requireMonitor, (req, res) => {
   const status = fritzMonitor.getStatus();
   res.json({ success: true, data: status });
 });
 
 // GET /api/monitor/profile/:profileId - Get monitoring data for a specific profile
-app.get('/api/monitor/profile/:profileId', (req, res) => {
+app.get('/api/monitor/profile/:profileId', requireMonitor, (req, res) => {
   const status = fritzMonitor.getProfileStats(req.params.profileId);
   res.json({ success: true, data: status });
 });
 
 // POST /api/monitor/reset - Reset monitoring data
-app.post('/api/monitor/reset', (req, res) => {
+app.post('/api/monitor/reset', requireMonitor, (req, res) => {
   fritzMonitor.resetData();
   res.json({ success: true, message: 'Monitor data reset' });
 });
@@ -324,6 +330,12 @@ app.post('/api/monitor/reset', (req, res) => {
 // Serve frontend
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Global error handler (prevents stack trace leaks)
+app.use((err, req, res, _next) => {
+  console.error('[Server] Unhandled error:', err.message);
+  res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
 app.listen(PORT, () => {
