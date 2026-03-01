@@ -168,10 +168,39 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   showToast('Déconnecté', 'info');
 });
 
+// === Unhandled promise rejection handler ===
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('Unhandled promise rejection:', e.reason);
+  e.preventDefault();
+});
+
+// === Debounce utility ===
+function debounce(fn, ms = 300) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+// === Skeleton loading placeholders ===
+function skeletonCards(count = 3) {
+  const card = `<div class="skeleton-card">
+    <div class="skeleton-circle"></div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+      <div class="skeleton-line wide"></div>
+      <div class="skeleton-line medium"></div>
+    </div>
+  </div>`;
+  return `<div class="skeleton-list">${card.repeat(count)}</div>`;
+}
+
 // Expose shared API for other modules
 window.state = state;
 window.API = API;
 window.api = api;
 window.showToast = showToast;
 window.withBtnGuard = withBtnGuard;
+window.debounce = debounce;
+window.skeletonCards = skeletonCards;
 })();

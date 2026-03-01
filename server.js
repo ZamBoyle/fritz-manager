@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 const FritzAuth = require('./src/fritzbox/auth');
@@ -33,12 +34,36 @@ setInterval(() => {
   }
 }, 300000).unref();
 
+// Input sanitization helper
+function sanitizeString(str, maxLen = 200) {
+  if (typeof str !== 'string') return null;
+  return str.trim().substring(0, maxLen);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Security headers via helmet (CSP disabled - we set a custom one below)
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// Custom Content Security Policy
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "connect-src 'self'; " +
+    "font-src 'self'"
+  );
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Auth guard: all /api/* routes except login and status require a valid session
@@ -71,12 +96,12 @@ app.post('/api/login', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Trop de tentatives. Réessayez dans 1 minute.' });
     }
 
-    const host = req.body.host || process.env.FRITZ_HOST || '192.168.178.1';
-    const username = req.body.username || process.env.FRITZ_USER || '';
-    const password = req.body.password || process.env.FRITZ_PASSWORD || '';
+    const host = sanitizeString(req.body.host) || process.env.FRITZ_HOST || '192.168.178.1';
+    const username = sanitizeString(req.body.username) || process.env.FRITZ_USER || '';
+    const password = sanitizeString(req.body.password, 500) || process.env.FRITZ_PASSWORD || '';
 
-    if (!password) {
-      return res.status(400).json({ success: false, error: 'Password is required' });
+    if (!host || !password) {
+      return res.status(400).json({ success: false, error: 'Invalid input' });
     }
 
     if (fritzAuth && fritzAuth.isSessionValid()) {
@@ -179,8 +204,11 @@ app.get('/api/filters', async (req, res) => {
 // POST /api/filters/block - Block/unblock a device via parental controls
 app.post('/api/filters/block', async (req, res) => {
   try {
-    const { uid, blocked } = req.body;
-    if (!uid) return res.status(400).json({ success: false, error: 'uid is required' });
+    const uid = sanitizeString(req.body.uid);
+    const blocked = req.body.blocked;
+    if (!uid || typeof blocked !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'Invalid input' });
+    }
     await fritzFilter.setDeviceBlocked(uid, blocked);
     res.json({ success: true, message: `Device ${uid} ${blocked ? 'blocked' : 'unblocked'}` });
   } catch (err) {
@@ -192,8 +220,11 @@ app.post('/api/filters/block', async (req, res) => {
 // POST /api/filters/profile - Change access profile for a device
 app.post('/api/filters/profile', async (req, res) => {
   try {
-    const { uid, profileId } = req.body;
-    if (!uid || !profileId) return res.status(400).json({ success: false, error: 'uid and profileId are required' });
+    const uid = sanitizeString(req.body.uid);
+    const profileId = sanitizeString(req.body.profileId);
+    if (!uid || !profileId) {
+      return res.status(400).json({ success: false, error: 'Invalid input' });
+    }
     await fritzFilter.setDeviceProfile(uid, profileId);
     res.json({ success: true, message: `Profile changed for ${uid}` });
   } catch (err) {
@@ -205,8 +236,11 @@ app.post('/api/filters/profile', async (req, res) => {
 // POST /api/devices/remove - Remove a device from Fritz!Box
 app.post('/api/devices/remove', async (req, res) => {
   try {
-    const { name, mac } = req.body;
-    if (!name) return res.status(400).json({ success: false, error: 'Device name is required' });
+    const name = sanitizeString(req.body.name);
+    const mac = sanitizeString(req.body.mac);
+    if (!name || !mac) {
+      return res.status(400).json({ success: false, error: 'Invalid input' });
+    }
     const result = await fritzFilter.removeDevice(name, mac);
     res.json({ success: true, message: `Device "${name}" removed`, ...result });
   } catch (err) {
@@ -284,6 +318,9 @@ app.get('/api/profiles/:id', async (req, res) => {
 
 app.post('/api/profiles', async (req, res) => {
   try {
+    if (!sanitizeString(req.body.name)) {
+      return res.status(400).json({ success: false, error: 'Invalid input' });
+    }
     const newId = await fritzFilter.saveProfile(null, req.body);
     res.json({ success: true, id: newId });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
@@ -291,6 +328,9 @@ app.post('/api/profiles', async (req, res) => {
 
 app.put('/api/profiles/:id', async (req, res) => {
   try {
+    if (!sanitizeString(req.body.name)) {
+      return res.status(400).json({ success: false, error: 'Invalid input' });
+    }
     await fritzFilter.saveProfile(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }

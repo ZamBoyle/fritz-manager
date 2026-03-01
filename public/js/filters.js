@@ -15,7 +15,7 @@ async function loadFilters(forceRefresh = false) {
 
   // If a request is already in flight, wait for it
   if (_filtersLoading) {
-    container.innerHTML = '<div class="loading">Chargement du contrôle parental...</div>';
+    container.innerHTML = skeletonCards(4);
     infoPanel.classList.add('hidden');
     try {
       await _filtersLoading;
@@ -26,7 +26,7 @@ async function loadFilters(forceRefresh = false) {
     return;
   }
 
-  container.innerHTML = '<div class="loading">Chargement du contrôle parental...</div>';
+  container.innerHTML = skeletonCards(4);
   infoPanel.classList.add('hidden');
 
   _filtersLoading = api('GET', API.FILTERS).then(res => {
@@ -129,7 +129,7 @@ async function changeProfile(uid, profileId) {
 }
 
 // Search
-document.getElementById('filter-search').addEventListener('input', renderFilters);
+document.getElementById('filter-search').addEventListener('input', debounce(renderFilters));
 
 // Expose public API
 window.loadFilters = loadFilters;

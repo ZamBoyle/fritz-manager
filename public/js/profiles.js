@@ -48,7 +48,7 @@ function switchFilterSubTab(tab) {
 
 async function loadProfiles() {
   const container = document.getElementById('profiles-grid');
-  container.innerHTML = '<div class="loading">Chargement des profils...</div>';
+  container.innerHTML = skeletonCards(3);
   try {
     const [profilesRes, metaRes] = await Promise.all([
       api('GET', API.PROFILES),

@@ -2,6 +2,7 @@
 'use strict';
 
 let currentFilter = 'all';
+let _wanAbortController = null;
 
 // === Favorites (server-side) ===
 let _favorites = new Set();
@@ -24,15 +25,25 @@ function isFavorite(mac) {
 }
 
 async function toggleFavorite(mac) {
+  // Optimistic toggle
   if (_favorites.has(mac)) _favorites.delete(mac);
   else _favorites.add(mac);
   renderDevices();
-  await api('POST', API.FAVORITES, { favorites: [..._favorites] });
+
+  try {
+    await api('POST', API.FAVORITES, { favorites: [..._favorites] });
+  } catch (err) {
+    // Rollback on failure
+    if (_favorites.has(mac)) _favorites.delete(mac);
+    else _favorites.add(mac);
+    renderDevices();
+    showToast('Erreur: favori non sauvegardé', 'error');
+  }
 }
 
 async function loadDevices() {
   const container = document.getElementById('devices-list');
-  container.innerHTML = '<div class="loading">Chargement des appareils...</div>';
+  container.innerHTML = skeletonCards(5);
 
   try {
     const [data] = await Promise.all([api('GET', API.DEVICES), loadFavorites()]);
@@ -47,16 +58,21 @@ async function loadDevices() {
 }
 
 async function loadWanStatusInBackground() {
+  if (_wanAbortController) _wanAbortController.abort();
+  _wanAbortController = new AbortController();
+  const signal = _wanAbortController.signal;
+
   const activeDevices = state.devices.filter(d => d.active && d.ip);
   for (const device of activeDevices) {
     try {
-      const res = await fetch(API.DEVICE_STATUS(device.ip));
+      const res = await fetch(API.DEVICE_STATUS(device.ip), { signal });
       const data = await res.json();
       if (data.success) {
         device.blocked = data.blocked;
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      // ignore other errors
     }
   }
   renderDevices();
@@ -227,7 +243,7 @@ function escapeAttr(str) {
 }
 
 // === Search ===
-document.getElementById('device-search').addEventListener('input', renderDevices);
+document.getElementById('device-search').addEventListener('input', debounce(renderDevices));
 
 // === Filter buttons ===
 document.querySelectorAll('.filter-btn').forEach(btn => {
