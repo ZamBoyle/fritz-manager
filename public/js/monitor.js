@@ -1,4 +1,5 @@
-// === Monitoring management ===
+(function() {
+'use strict';
 
 let monitorRefreshTimer = null;
 let _monitorPolling = false;
@@ -22,7 +23,7 @@ async function loadMonitorData() {
           clearInterval(monitorRefreshTimer);
           return;
         }
-        if (_monitorPolling) return; // Skip if previous poll still in flight
+        if (_monitorPolling) return;
         _monitorPolling = true;
         try {
           const r = await api('GET', '/api/monitor/status');
@@ -43,7 +44,6 @@ function updateMonitorUI(data) {
   const summary = document.getElementById('monitor-summary');
   const container = document.getElementById('monitor-devices');
 
-  // Update toggle button
   if (data.running) {
     btn.textContent = 'Arrêter le monitoring';
     btn.className = 'btn-monitor-stop';
@@ -56,7 +56,6 @@ function updateMonitorUI(data) {
     statusText.className = 'monitor-status-text';
   }
 
-  // Filter by selected profile
   const profileFilter = document.getElementById('monitor-profile-filter').value;
   let devices = data.devices || [];
   if (profileFilter !== 'all') {
@@ -71,7 +70,6 @@ function updateMonitorUI(data) {
     return;
   }
 
-  // Summary
   const onlineCount = devices.filter(d => d.isOnline).length;
   const totalTodayMs = devices.reduce((sum, d) => sum + d.todayMs, 0);
   summary.classList.remove('hidden');
@@ -94,14 +92,12 @@ function updateMonitorUI(data) {
     </div>` : ''}
   `;
 
-  // Device cards
   container.innerHTML = devices.map(device => {
     const onlineClass = device.isOnline ? 'monitor-online' : '';
     const sessionInfo = device.isOnline && device.currentSessionStart
       ? `<span class="session-live">Session en cours : ${formatDuration(Date.now() - device.currentSessionStart)}</span>`
       : '';
 
-    // Build daily history bars (last 7 days)
     const historyHtml = buildHistoryBars(device.dailyHistory);
 
     return `
@@ -136,7 +132,6 @@ function updateMonitorUI(data) {
 function buildHistoryBars(dailyHistory) {
   if (!dailyHistory || Object.keys(dailyHistory).length === 0) return '';
 
-  // Get last 7 days
   const days = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
@@ -146,7 +141,7 @@ function buildHistoryBars(dailyHistory) {
     days.push({ key, dayName, ms: dailyHistory[key] || 0 });
   }
 
-  const maxMs = Math.max(...days.map(d => d.ms), 3600000); // At least 1h scale
+  const maxMs = Math.max(...days.map(d => d.ms), 3600000);
 
   const bars = days.map(day => {
     const pct = Math.max((day.ms / maxMs) * 100, 2);
@@ -195,13 +190,19 @@ async function toggleMonitor() {
   }
 }
 
+function cleanupMonitor() {
+  if (monitorRefreshTimer) {
+    clearInterval(monitorRefreshTimer);
+    monitorRefreshTimer = null;
+  }
+  _monitorPolling = false;
+}
+
 async function populateProfileFilter() {
   const select = document.getElementById('monitor-profile-filter');
-  // Only populate if we haven't added custom options yet
   if (select.options.length > 1) return;
 
   try {
-    // Try to get profiles from filters data
     if (state.filters && state.filters.profiles) {
       state.filters.profiles.forEach(p => {
         const opt = document.createElement('option');
@@ -210,7 +211,6 @@ async function populateProfileFilter() {
         select.appendChild(opt);
       });
     } else {
-      // Fetch from API
       const res = await api('GET', '/api/filters');
       if (res.data && res.data.profiles) {
         res.data.profiles.forEach(p => {
@@ -223,3 +223,9 @@ async function populateProfileFilter() {
     }
   } catch (e) { /* ignore */ }
 }
+
+// Expose public API
+window.loadMonitorData = loadMonitorData;
+window.toggleMonitor = toggleMonitor;
+window.cleanupMonitor = cleanupMonitor;
+})();

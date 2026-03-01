@@ -1,4 +1,5 @@
-// === Parental Controls management ===
+(function() {
+'use strict';
 
 let _filtersLoading = null; // Shared promise to avoid duplicate calls
 
@@ -134,3 +135,9 @@ async function changeProfile(uid, profileId) {
 
 // Search
 document.getElementById('filter-search').addEventListener('input', renderFilters);
+
+// Expose public API
+window.loadFilters = loadFilters;
+window.toggleKidBlock = toggleKidBlock;
+window.changeProfile = changeProfile;
+})();

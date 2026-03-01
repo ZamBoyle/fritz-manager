@@ -9,6 +9,30 @@ const FritzMonitor = require('./src/fritzbox/monitor');
 
 const FAVORITES_FILE = path.join(__dirname, 'favorites.json');
 
+// Rate limiter for login (in-memory, 5 attempts per minute per IP)
+const loginAttempts = new Map();
+const RATE_LIMIT_WINDOW = 60000;
+const RATE_LIMIT_MAX = 5;
+
+function checkLoginRate(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+  if (!record || now > record.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  record.count++;
+  return record.count <= RATE_LIMIT_MAX;
+}
+
+// Cleanup stale rate-limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of loginAttempts) {
+    if (now > record.resetAt) loginAttempts.delete(ip);
+  }
+}, 300000).unref();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -18,11 +42,17 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Auth guard: all /api/* routes except login and status require a valid session
-app.use('/api', (req, res, next) => {
+// Auto-refreshes the Fritz!Box SID if it's about to expire
+app.use('/api', async (req, res, next) => {
   const openRoutes = ['/login', '/logout', '/status'];
   if (openRoutes.includes(req.path)) return next();
-  if (!fritzAuth || !fritzAuth.isSessionValid()) {
+  if (!fritzAuth) {
     return res.status(401).json({ success: false, error: 'Not connected' });
+  }
+  try {
+    await fritzAuth.ensureSession();
+  } catch (err) {
+    return res.status(401).json({ success: false, error: 'Session expired. Please reconnect.' });
   }
   next();
 });
@@ -36,12 +66,21 @@ let fritzMonitor = null;
 // POST /api/login - Connect to Fritz!Box
 app.post('/api/login', async (req, res) => {
   try {
+    // Rate limiting
+    if (!checkLoginRate(req.ip)) {
+      return res.status(429).json({ success: false, error: 'Trop de tentatives. Réessayez dans 1 minute.' });
+    }
+
     const host = req.body.host || process.env.FRITZ_HOST || '192.168.178.1';
     const username = req.body.username || process.env.FRITZ_USER || '';
     const password = req.body.password || process.env.FRITZ_PASSWORD || '';
 
     if (!password) {
       return res.status(400).json({ success: false, error: 'Password is required' });
+    }
+
+    if (fritzAuth && fritzAuth.isSessionValid()) {
+      console.warn(`[Server] Overwriting existing session (host: ${fritzAuth.host})`);
     }
 
     fritzAuth = new FritzAuth(host, username, password);

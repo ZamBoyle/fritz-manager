@@ -1,3 +1,6 @@
+(function() {
+'use strict';
+
 // === Global state ===
 const state = {
   connected: false,
@@ -116,10 +119,7 @@ document.getElementById('refresh-btn').addEventListener('click', () => {
 // === Logout ===
 document.getElementById('logout-btn').addEventListener('click', async () => {
   // Clear monitor auto-refresh timer
-  if (typeof monitorRefreshTimer !== 'undefined' && monitorRefreshTimer) {
-    clearInterval(monitorRefreshTimer);
-    monitorRefreshTimer = null;
-  }
+  cleanupMonitor();
 
   // Server-side cleanup (stop monitor, clear session)
   try { await api('POST', '/api/logout'); } catch { /* ignore */ }
@@ -133,3 +133,9 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   document.getElementById('password').value = '';
   showToast('Déconnecté', 'info');
 });
+
+// Expose shared API for other modules
+window.state = state;
+window.api = api;
+window.showToast = showToast;
+})();

@@ -10,6 +10,7 @@ class FritzMonitor {
     this.fritzHosts = fritzHosts;
     this.timer = null;
     this.running = false;
+    this._polling = false;
 
     // { "device-uid": { name, profileId, profileName, sessions: [{ start, end }], totalToday: ms, totalAll: ms } }
     this.deviceData = {};
@@ -47,12 +48,13 @@ class FritzMonitor {
   }
 
   async _poll() {
+    if (this._polling) return;
+    this._polling = true;
     try {
       const now = Date.now();
 
       // Get active devices from TR-064
       const hosts = await this.fritzHosts.getHostListXml();
-      const activeIps = new Set(hosts.filter(h => h.active).map(h => h.ip));
       const hostByName = new Map(hosts.map(h => [h.hostname, h]));
 
       // Get parental control data
@@ -111,6 +113,8 @@ class FritzMonitor {
       this._saveData();
     } catch (err) {
       console.error('[Monitor] Poll error:', err.message);
+    } finally {
+      this._polling = false;
     }
   }
 

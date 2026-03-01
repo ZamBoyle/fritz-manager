@@ -83,14 +83,20 @@ class FritzHosts {
   async getAllHosts() {
     const count = await this.getHostCount();
     const hosts = [];
+    const BATCH_SIZE = 10;
 
-    for (let i = 0; i < count; i++) {
-      try {
-        const host = await this.getHostByIndex(i);
-        hosts.push(host);
-      } catch (err) {
-        console.warn(`[Hosts] Failed to get host at index ${i}:`, err.message);
+    for (let i = 0; i < count; i += BATCH_SIZE) {
+      const batch = [];
+      for (let j = i; j < Math.min(i + BATCH_SIZE, count); j++) {
+        batch.push(
+          this.getHostByIndex(j).catch(err => {
+            console.warn(`[Hosts] Failed to get host at index ${j}:`, err.message);
+            return null;
+          })
+        );
       }
+      const results = await Promise.all(batch);
+      hosts.push(...results.filter(Boolean));
     }
 
     this._updateLastSeen(hosts);

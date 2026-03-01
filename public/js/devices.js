@@ -1,4 +1,5 @@
-// === Devices management ===
+(function() {
+'use strict';
 
 let currentFilter = 'all';
 
@@ -252,3 +253,14 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     renderDevices();
   });
 });
+
+// Expose public API
+window.escapeHtml = escapeHtml;
+window.escapeAttr = escapeAttr;
+window.loadDevices = loadDevices;
+window.blockDevice = blockDevice;
+window.unblockDevice = unblockDevice;
+window.removeDevice = removeDevice;
+window.removeAllOffline = removeAllOffline;
+window.toggleFavorite = toggleFavorite;
+})();

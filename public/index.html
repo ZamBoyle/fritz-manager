@@ -59,7 +59,7 @@
       <section id="tab-devices" class="tab-content active">
         <div class="toolbar">
           <div class="search-box">
-            <input type="text" id="device-search" placeholder="Rechercher un appareil...">
+            <input type="text" id="device-search" placeholder="Rechercher un appareil..." aria-label="Rechercher un appareil">
           </div>
           <div class="filter-buttons">
             <button class="filter-btn active" data-filter="all">Tous</button>
@@ -95,7 +95,7 @@
         <div id="subtab-devices" class="subtab-content">
           <div class="toolbar">
             <div class="search-box">
-              <input type="text" id="filter-search" placeholder="Rechercher un appareil...">
+              <input type="text" id="filter-search" placeholder="Rechercher un appareil..." aria-label="Rechercher un appareil">
             </div>
           </div>
           <div id="filters-info" class="info-panel hidden"></div>
@@ -105,7 +105,7 @@
         </div>
 
         <!-- Profile Editor Modal -->
-        <div id="profile-editor-modal" class="modal hidden">
+        <div id="profile-editor-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="profile-editor-title">
           <div class="modal-backdrop" onclick="closeProfileEditor()"></div>
           <div class="modal-content profile-editor">
             <div class="modal-header">

@@ -1,4 +1,5 @@
-// === Profile Management ===
+(function() {
+'use strict';
 
 let profilesMeta = {};
 let profilesList = [];
@@ -6,7 +7,7 @@ let editingProfile = null;
 let _scheduleState = null;
 let _scheduleMouseDown = false;
 let _schedulePaintMode = null;
-let _scheduleAbort = null; // AbortController for schedule grid listeners
+let _scheduleAbort = null;
 let _selectedProfileIcon = null;
 const _originalModalBodyHtml = document.querySelector('#profile-editor-modal .modal-body')?.innerHTML || '';
 
@@ -103,6 +104,9 @@ async function openProfileEditor(profileId = null) {
   const modal = document.getElementById('profile-editor-modal');
   const title = document.getElementById('profile-editor-title');
 
+  // Remember what had focus before opening (to restore on close)
+  modal._previousFocus = document.activeElement;
+
   if (profileId) {
     title.textContent = 'Modifier le profil';
     modal.classList.remove('hidden');
@@ -124,10 +128,13 @@ async function openProfileEditor(profileId = null) {
     rebuildModalBody();
     resetProfileForm();
   }
+
+  // Focus first input inside modal
+  const firstInput = modal.querySelector('input:not([disabled]), button:not(.modal-close):not([disabled])');
+  if (firstInput) firstInput.focus();
 }
 
 function rebuildModalBody() {
-  // Restore the original form HTML (in case it was replaced by loading indicator)
   const body = document.querySelector('#profile-editor-modal .modal-body');
   if (body && !document.getElementById('profile-name')) {
     body.innerHTML = _originalModalBodyHtml;
@@ -137,39 +144,34 @@ function rebuildModalBody() {
 }
 
 function closeProfileEditor() {
-  document.getElementById('profile-editor-modal').classList.add('hidden');
+  const modal = document.getElementById('profile-editor-modal');
+  modal.classList.add('hidden');
   editingProfile = null;
   _scheduleState = null;
   _websiteListCache = {};
   if (_scheduleAbort) { _scheduleAbort.abort(); _scheduleAbort = null; }
+  // Restore focus to the element that opened the modal
+  if (modal._previousFocus) { modal._previousFocus.focus(); modal._previousFocus = null; }
 }
 
 function populateProfileForm(data) {
   document.getElementById('profile-name').value = data.name || '';
 
-  // Time radio
   const timeRadio = document.querySelector(`input[name="profile-time"][value="${data.time}"]`);
   if (timeRadio) timeRadio.checked = true;
 
-  // Budget radio
   const budgetRadio = document.querySelector(`input[name="profile-budget"][value="${data.budget}"]`);
   if (budgetRadio) budgetRadio.checked = true;
 
-  // Checkboxes
   document.getElementById('profile-share-budget').checked = data.shareBudget;
   document.getElementById('profile-disallow-guest').checked = data.disallowGuest;
   document.getElementById('profile-parental').checked = data.parental;
 
-  // Filter type
   const filterRadio = document.querySelector(`input[name="profile-filtertype"][value="${data.filterType}"]`);
   if (filterRadio) filterRadio.checked = true;
 
-  // Schedule
   _scheduleState = initScheduleFromTimerItems(data.timerItems || []);
-
-  // Budget per day
   renderBudgetDays(data.budgetPerDay);
-
   updateFormSections();
   if (data.time === 'limited') renderScheduleGrid();
 }
@@ -205,10 +207,27 @@ function toggleFilterSection() {
   updateFormSections();
 }
 
-// Close modal on Escape key
+// Close modal on Escape key + focus trap
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !document.getElementById('profile-editor-modal').classList.contains('hidden')) {
+  const modal = document.getElementById('profile-editor-modal');
+  if (modal.classList.contains('hidden')) return;
+
+  if (e.key === 'Escape') {
     closeProfileEditor();
+    return;
+  }
+
+  // Focus trap: keep Tab/Shift+Tab inside modal
+  if (e.key === 'Tab') {
+    const focusable = modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
   }
 });
 
@@ -255,7 +274,6 @@ async function loadWebsiteList() {
   const filterType = document.querySelector('input[name="profile-filtertype"]:checked')?.value || 'black';
   titleEl.textContent = filterType === 'black' ? 'Sites bloques' : 'Sites autorises';
 
-  // Use cache if available
   if (_websiteListCache[filterType]) {
     renderWebsiteList(_websiteListCache[filterType], filterType);
     return;
@@ -303,7 +321,6 @@ async function addWebsiteEntry() {
 
   const filterType = document.querySelector('input[name="profile-filtertype"]:checked')?.value || 'black';
 
-  // Get current list and add new entry
   const cached = _websiteListCache[filterType];
   const currentUrls = (cached?.list || []).map(e => e.url);
   if (currentUrls.includes(url)) {
@@ -317,7 +334,7 @@ async function addWebsiteEntry() {
   try {
     await api('PUT', `/api/profiles/websites/${filterType}`, { urls: newUrls });
     input.value = '';
-    delete _websiteListCache[filterType]; // force refresh
+    delete _websiteListCache[filterType];
     await loadWebsiteList();
     showToast(`${url} ajoute`, 'success');
   } catch (err) {
@@ -422,16 +439,13 @@ function renderScheduleGrid() {
 
   grid.innerHTML = html;
 
-  // Clean up previous listeners before adding new ones
   if (_scheduleAbort) _scheduleAbort.abort();
   _scheduleAbort = new AbortController();
   const signal = _scheduleAbort.signal;
 
-  // Drag-to-paint support
   grid.addEventListener('mousedown', onScheduleMouseDown, { signal });
   grid.addEventListener('mouseover', onScheduleMouseOver, { signal });
   document.addEventListener('mouseup', onScheduleMouseUp, { signal });
-  // Touch support
   grid.addEventListener('touchstart', onScheduleTouchStart, { passive: false, signal });
   grid.addEventListener('touchmove', onScheduleTouchMove, { passive: false, signal });
   grid.addEventListener('touchend', onScheduleMouseUp, { signal });
@@ -531,7 +545,6 @@ async function saveProfileForm() {
     const time = document.querySelector('input[name="profile-time"]:checked')?.value || 'unlimited';
     const budget = document.querySelector('input[name="profile-budget"]:checked')?.value || 'unlimited';
 
-    // Collect budget per day
     const budgetPerDay = {};
     document.querySelectorAll('.budget-input').forEach(inp => {
       const day = inp.dataset.day;
@@ -540,7 +553,6 @@ async function saveProfileForm() {
       budgetPerDay[day][unit] = parseInt(inp.value) || 0;
     });
 
-    // Collect timer items from schedule grid
     const timerItems = time === 'limited' && _scheduleState ? scheduleGridToTimerItems(_scheduleState) : [];
 
     const formData = {
@@ -565,7 +577,6 @@ async function saveProfileForm() {
       savedId = res.id;
     }
 
-    // Save icon metadata
     if (savedId && _selectedProfileIcon) {
       profilesMeta[savedId] = { icon: _selectedProfileIcon };
       await api('POST', '/api/profiles/meta', { meta: profilesMeta });
@@ -603,3 +614,16 @@ async function deleteProfile(profileId, name) {
     _deleteProfilePending = false;
   }
 }
+
+// Expose public API
+window.loadProfiles = loadProfiles;
+window.openProfileEditor = openProfileEditor;
+window.closeProfileEditor = closeProfileEditor;
+window.saveProfileForm = saveProfileForm;
+window.deleteProfile = deleteProfile;
+window.switchFilterSubTab = switchFilterSubTab;
+window.selectIcon = selectIcon;
+window.toggleFilterSection = toggleFilterSection;
+window.addWebsiteEntry = addWebsiteEntry;
+window.removeWebsiteEntry = removeWebsiteEntry;
+})();
