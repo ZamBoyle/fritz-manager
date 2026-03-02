@@ -147,7 +147,7 @@ class FritzFilter {
   async setDeviceBlocked(uid, blocked) {
     const sid = await this.auth.ensureSession();
 
-    await axios.post(
+    const response = await axios.post(
       `${this.baseUrl}/data.lua`,
       new URLSearchParams({
         sid,
@@ -163,7 +163,8 @@ class FritzFilter {
       }
     );
 
-    this._cache = null; // Invalidate cache
+    this._checkResponse(response.data, 'setDeviceBlocked');
+    this._cache = null;
     console.log(`[Filter] Device ${uid} ${blocked ? 'blocked' : 'unblocked'}`);
   }
 
@@ -180,7 +181,7 @@ class FritzFilter {
     });
     params.append(`profile:${uid}`, profileId);
 
-    await axios.post(
+    const response = await axios.post(
       `${this.baseUrl}/data.lua`,
       params.toString(),
       {
@@ -190,7 +191,8 @@ class FritzFilter {
       }
     );
 
-    this._cache = null; // Invalidate cache
+    this._checkResponse(response.data, 'setDeviceProfile');
+    this._cache = null;
     console.log(`[Filter] Device ${uid} profile changed to ${profileId}`);
   }
 
@@ -280,7 +282,7 @@ class FritzFilter {
 
   // Remove ALL inactive devices by deleting them one by one
   async cleanupDevices() {
-    const sid = await this.auth.ensureSession();
+    let sid = await this.auth.ensureSession();
     const postOpts = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       timeout: 15000,
@@ -301,6 +303,10 @@ class FritzFilter {
     let removed = 0;
     for (const dev of inactive) {
       try {
+        // Refresh SID every 10 deletions to avoid expiration during long loops
+        if (removed > 0 && removed % 10 === 0) {
+          sid = await this.auth.ensureSession();
+        }
         // Step 1: request deletion
         await axios.post(
           `${this.baseUrl}/data.lua`,
@@ -544,19 +550,11 @@ class FritzFilter {
     return result;
   }
 
-  // Debug: fetch any data.lua page
-  async debugPage(pageName) {
-    const sid = await this.auth.ensureSession();
-    const response = await axios.post(
-      `${this.baseUrl}/data.lua`,
-      new URLSearchParams({ sid, xhr: '1', page: pageName }).toString(),
-      {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        timeout: 30000,
-        transformResponse: [(data) => data],
-      }
-    );
-    return response.data;
+  // Sanity-check data.lua responses (always HTTP 200, so check body for login redirect)
+  _checkResponse(body, context) {
+    if (typeof body === 'string' && body.includes('"sid":"0000000000000000"')) {
+      throw new Error(`Fritz!Box session expired during ${context}`);
+    }
   }
 
   _decodeHtml(str) {

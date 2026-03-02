@@ -55,7 +55,14 @@ class FritzMonitor {
 
       // Get active devices from TR-064
       const hosts = await this.fritzHosts.getHostListXml();
-      const hostByName = new Map(hosts.map(h => [h.hostname, h]));
+      // Build lookup by hostname — for duplicates, prefer the active one
+      const hostByName = new Map();
+      for (const h of hosts) {
+        const existing = hostByName.get(h.hostname);
+        if (!existing || (h.active && !existing.active)) {
+          hostByName.set(h.hostname, h);
+        }
+      }
 
       // Get parental control data
       const kidData = await this.fritzFilter.getParentalControls();
@@ -65,7 +72,7 @@ class FritzMonitor {
       const currentlyOnline = new Set();
 
       for (const dev of devices) {
-        // Check if this device is online by matching hostname to active hosts
+        // Match kidLis device to TR-064 host by name (prefer active duplicate)
         const host = hostByName.get(dev.name);
         const isOnline = host ? host.active : false;
 

@@ -31,10 +31,10 @@ All Fritz modules are instantiated on login and cleared on logout. Single `fritz
 Each file is an **IIFE** exporting public functions to `window`. Load order matters (set in `index.html`):
 
 1. **app.js** → exports: `state`, `API`, `api()`, `showToast()`, `withBtnGuard()`, `debounce()`, `skeletonCards()`
-2. **devices.js** → exports: `loadDevices`, `blockDevice`, `unblockDevice`, `toggleFavorite`, `removeDevice`, `cleanupDevices`
-3. **filters.js** → exports: `loadFilters`, `renderFilters`, `toggleKidBlock`, `changeProfile`
-4. **profiles.js** → exports: `loadProfiles`, `openProfileEditor`, `deleteProfile`, `saveProfile`
-5. **monitor.js** → exports: `loadMonitorData`, `toggleMonitor`, `resetMonitor`
+2. **devices.js** → exports: `escapeHtml`, `escapeAttr`, `loadDevices`, `removeDevice`, `removeAllOffline`, `toggleFavorite`
+3. **filters.js** → exports: `loadFilters`, `toggleKidBlock`, `changeProfile`
+4. **profiles.js** → exports: `loadProfiles`, `openProfileEditor`, `closeProfileEditor`, `deleteProfile`, `saveProfileForm`, `switchFilterSubTab`, `selectIcon`, `toggleFilterSection`, `addWebsiteEntry`, `removeWebsiteEntry`
+5. **monitor.js** → exports: `loadMonitorData`, `toggleMonitor`, `cleanupMonitor`
 
 **State**: single `window.state` object (`{ connected, devices, filters }`). Rendering is always full re-render from state, not incremental DOM updates.
 
@@ -44,8 +44,8 @@ Each file is an **IIFE** exporting public functions to `window`. Load order matt
 - `withBtnGuard(btn, fn)` — disable button during async action, catch errors → toast
 - `api(method, url, body)` — fetch wrapper with 30s timeout, returns `{ success, data, error }`
 - Optimistic UI with rollback (favorites)
-- AbortController for cancellable background fetches (WAN status)
 - Promise deduplication to prevent duplicate API calls on rapid tab switches
+- `forceRefresh` parameter pattern on `loadFilters()` / `loadProfiles()` for cache-or-fetch behavior
 
 ### Data files (gitignored)
 
@@ -56,7 +56,7 @@ Each file is an **IIFE** exporting public functions to `window`. Load order matt
 - **French UI strings**, English code (variables, functions, classes, comments)
 - CSS: BEM-like with hyphens (`.device-card`, `.profile-card-header`), dark theme via CSS variables (`--bg-card`, `--accent`, `--danger`, etc.)
 - Backend classes: `FritzAuth`, `FritzHosts`, `FritzFilter`, `FritzSoap`, `FritzMonitor`
-- Private module vars prefixed with `_` (`_wanAbortController`, `_filtersLoading`)
+- Private module vars prefixed with `_` (`_filtersLoading`, `_changeProfilePending`)
 - Frontend uses `escapeHtml()` / `escapeAttr()` for all innerHTML templates
 - Backend uses `sanitizeString(str, maxLen)` on all POST/PUT body fields
 
@@ -69,6 +69,8 @@ Each file is an **IIFE** exporting public functions to `window`. Load order matt
 - Website filter lists require **full replacement** with `\r` (%0D) separator, max 500 entries
 - TR-064 SOAP (port 49000) requires **HTTP Digest Auth**, not Basic Auth
 - Device names can be duplicated — always use **MAC as primary identifier**
+- Blocking a device creates a **duplicate `user*` UID** alongside the `landevice*` UID — unblock must handle both
+- After unblocking a `landevice*`, Fritz!Box may **remove it from `kidLis`** — use the device name (sent by frontend) to find remaining `user*` entries
 
 ## Configuration
 

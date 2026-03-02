@@ -590,7 +590,7 @@ async function saveProfileForm() {
     showToast(editingProfile ? 'Profil modifié' : 'Profil créé', 'success');
     closeProfileEditor();
     state.filters = null;
-    await loadProfiles();
+    await loadProfiles(true);
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
   } finally {
@@ -612,7 +612,7 @@ async function deleteProfile(profileId, name) {
     await api('POST', API.PROFILES_META, { meta: profilesMeta });
     showToast(`Profil "${name}" supprimé`, 'success');
     state.filters = null;
-    await loadProfiles();
+    await loadProfiles(true);
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
   } finally {

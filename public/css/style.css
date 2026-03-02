@@ -451,44 +451,6 @@ header h1 span {
 }
 
 /* === Filters Tab === */
-.add-form {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-}
-
-.add-form input {
-  flex: 1;
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 14px;
-  outline: none;
-}
-
-.add-form input:focus {
-  border-color: var(--accent);
-}
-
-.btn-primary {
-  padding: 10px 20px;
-  background: var(--danger);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.2s;
-}
-
-.btn-primary:hover {
-  background: var(--danger-hover);
-}
-
 .info-panel {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -497,33 +459,6 @@ header h1 span {
   margin-bottom: 16px;
   font-size: 13px;
   color: var(--text-secondary);
-}
-
-.list-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.filter-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: all 0.2s;
-}
-
-.filter-item:hover {
-  border-color: var(--danger);
-}
-
-.filter-url {
-  font-size: 14px;
-  font-weight: 500;
-  word-break: break-all;
 }
 
 .btn-remove {
@@ -570,22 +505,6 @@ header h1 span {
 
 .device-card.restricted {
   border-left: 3px solid var(--warning);
-}
-
-.raw-json {
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 16px;
-  font-size: 12px;
-  font-family: 'Cascadia Code', 'Fira Code', monospace;
-  color: var(--text-secondary);
-  overflow-x: auto;
-  max-height: 600px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.4;
 }
 
 /* === Loading & Empty States === */
@@ -881,10 +800,6 @@ header h1 span {
   }
 
   .toolbar {
-    flex-direction: column;
-  }
-
-  .add-form {
     flex-direction: column;
   }
 
@@ -1428,8 +1343,6 @@ header h1 span {
 
 .skeleton-line.wide { width: 60%; }
 .skeleton-line.medium { width: 40%; }
-.skeleton-line.narrow { width: 25%; }
-
 .skeleton-circle {
   width: 10px;
   height: 10px;

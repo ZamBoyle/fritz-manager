@@ -39,21 +39,6 @@ class FritzSoap {
     });
   }
 
-  async call(controlUrl, serviceType, actionName, args = {}) {
-    const soapBody = this._buildSoapBody(serviceType, actionName, args);
-    const url = `${this.baseUrl}${controlUrl}`;
-
-    const response = await axios.post(url, soapBody, {
-      headers: {
-        'Content-Type': 'text/xml; charset="utf-8"',
-        'SoapAction': `${serviceType}#${actionName}`,
-      },
-      timeout: 10000,
-    });
-
-    return this._parseSoapResponse(response.data, actionName);
-  }
-
   async callAuthenticated(controlUrl, serviceType, actionName, username, password, args = {}) {
     const soapBody = this._buildSoapBody(serviceType, actionName, args);
     const url = `${this.baseUrl}${controlUrl}`;
@@ -65,8 +50,9 @@ class FritzSoap {
     // Step 1: Send request without auth to get Digest challenge
     let wwwAuth;
     try {
-      await axios.post(url, soapBody, { headers, timeout: 10000 });
-      // If no 401, parse directly (unlikely for authenticated services)
+      const response = await axios.post(url, soapBody, { headers, timeout: 10000 });
+      // No 401 — request succeeded without auth, return directly
+      return this._parseSoapResponse(response.data, actionName);
     } catch (err) {
       if (err.response && err.response.status === 401) {
         wwwAuth = err.response.headers['www-authenticate'];
@@ -76,9 +62,7 @@ class FritzSoap {
     }
 
     if (!wwwAuth) {
-      // No auth challenge, try without auth
-      const response = await axios.post(url, soapBody, { headers, timeout: 10000 });
-      return this._parseSoapResponse(response.data, actionName);
+      throw new Error('SOAP 401 without WWW-Authenticate header');
     }
 
     // Step 2: Parse Digest challenge and compute response
