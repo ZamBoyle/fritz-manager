@@ -10,10 +10,10 @@ Tableau de bord web pour gérer les appareils, le contrôle parental et le monit
 
 ### Appareils
 - Liste des appareils connectés (IP, MAC, WiFi/Ethernet, débit)
-- Filtrage par statut : en ligne, hors ligne, bloqués, favoris
-- Blocage/déblocage de l'accès internet (WAN)
+- Filtrage : tous, favoris, en ligne
 - Suppression des appareils hors ligne (individuelle ou en masse)
 - Dernière connexion (last seen) pour les appareils hors ligne
+- Indicateur visuel si l'appareil est bloqué (via contrôle parental)
 
 ### Contrôle parental
 - **Profils** : création, édition, suppression de profils de filtrage
@@ -115,8 +115,8 @@ Ouvrir `http://localhost:3000` dans le navigateur.
 |---------|-------|-------------|
 | GET | `/api/devices` | Liste des appareils |
 | GET | `/api/devices/:ip/status` | Statut WAN d'un appareil |
-| POST | `/api/devices/:ip/block` | Bloquer l'accès WAN |
-| POST | `/api/devices/:ip/unblock` | Débloquer l'accès WAN |
+| POST | `/api/devices/:ip/block` | Bloquer l'accès WAN (TR-064) |
+| POST | `/api/devices/:ip/unblock` | Débloquer l'accès WAN (TR-064) |
 | POST | `/api/devices/remove` | Supprimer un appareil |
 | POST | `/api/devices/cleanup` | Supprimer tous les inactifs |
 
@@ -135,6 +135,8 @@ Ouvrir `http://localhost:3000` dans le navigateur.
 | POST | `/api/profiles` | Créer un profil |
 | PUT | `/api/profiles/:id` | Modifier un profil |
 | DELETE | `/api/profiles/:id` | Supprimer un profil |
+| GET | `/api/profiles/meta` | Métadonnées locales (icônes) |
+| POST | `/api/profiles/meta` | Sauvegarder les métadonnées |
 | GET | `/api/profiles/websites/:type` | Liste noire/blanche |
 | PUT | `/api/profiles/websites/:type` | Modifier la liste |
 
@@ -144,6 +146,7 @@ Ouvrir `http://localhost:3000` dans le navigateur.
 | POST | `/api/monitor/start` | Démarrer le suivi |
 | POST | `/api/monitor/stop` | Arrêter le suivi |
 | GET | `/api/monitor/status` | Stats de tous les appareils |
+| GET | `/api/monitor/profile/:profileId` | Stats par profil |
 | POST | `/api/monitor/reset` | Réinitialiser les données |
 
 ### Favoris
