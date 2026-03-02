@@ -46,7 +46,12 @@ function switchFilterSubTab(tab) {
 
 // === Profile Cards ===
 
-async function loadProfiles() {
+async function loadProfiles(forceRefresh = false) {
+  if (!forceRefresh && profilesList && profilesList.length > 0) {
+    renderProfileCards();
+    return;
+  }
+
   const container = document.getElementById('profiles-grid');
   container.innerHTML = skeletonCards(3);
   try {

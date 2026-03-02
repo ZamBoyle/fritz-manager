@@ -201,16 +201,33 @@ app.get('/api/filters', async (req, res) => {
   }
 });
 
-// POST /api/filters/block - Block/unblock a device via parental controls
+// POST /api/filters/block - Block/unblock device(s) via parental controls
+// Accepts { uids: [...], blocked: bool } — multiple UIDs for Fritz!Box duplicate entries
 app.post('/api/filters/block', async (req, res) => {
   try {
-    const uid = sanitizeString(req.body.uid);
+    const uids = (Array.isArray(req.body.uids) ? req.body.uids : [req.body.uid]).map(s => sanitizeString(s)).filter(Boolean);
     const blocked = req.body.blocked;
-    if (!uid || typeof blocked !== 'boolean') {
+    if (uids.length === 0 || typeof blocked !== 'boolean') {
       return res.status(400).json({ success: false, error: 'Invalid input' });
     }
-    await fritzFilter.setDeviceBlocked(uid, blocked);
-    res.json({ success: true, message: `Device ${uid} ${blocked ? 'blocked' : 'unblocked'}` });
+
+    for (const uid of uids) {
+      await fritzFilter.setDeviceBlocked(uid, blocked);
+    }
+
+    // When unblocking, Fritz!Box may have created extra user* entries during blocking
+    // that the frontend doesn't know about. Use the device name (sent by frontend) to find them.
+    if (!blocked && req.body.name) {
+      const name = sanitizeString(req.body.name);
+      const data = await fritzFilter.getParentalControls(true);
+      const remaining = data.devices.filter(d => d.name === name && d.blocked && !uids.includes(d.uid));
+      for (const dup of remaining) {
+        await fritzFilter.setDeviceBlocked(dup.uid, false);
+        console.log(`[Filters] Also unblocked ${dup.uid} for "${dup.name}"`);
+      }
+    }
+
+    res.json({ success: true, message: `${uids.length} device(s) ${blocked ? 'blocked' : 'unblocked'}` });
   } catch (err) {
     console.error('[Filters] Block error:', err.message);
     res.status(500).json({ success: false, error: err.message });

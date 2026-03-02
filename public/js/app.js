@@ -141,7 +141,7 @@ document.getElementById('refresh-btn').addEventListener('click', () => {
   if (activeTab === 'filters') {
     const activeSubTab = document.querySelector('.sub-tab.active')?.dataset.subtab;
     if (activeSubTab === 'devices') loadFilters(true);
-    else loadProfiles();
+    else loadProfiles(true);
   }
   if (activeTab === 'monitor') loadMonitorData();
   showToast('Actualisation...', 'info');

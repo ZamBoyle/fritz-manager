@@ -106,11 +106,27 @@ async function toggleKidBlock(uid, block) {
   const card = document.querySelector(`[data-uid="${uid}"]`);
   const btn = card?.querySelector('.btn-block, .btn-unblock');
   await withBtnGuard(btn, async () => {
-    await api('POST', API.FILTERS_BLOCK, { uid, blocked: block });
-    const device = state.filters?.devices?.find(d => d.uid === uid);
-    if (device) {
-      device.blocked = block;
-      device.usage = block ? 'Device block enabled' : 'Unrestricted';
+    // When unblocking, find all duplicate UIDs for the same device (Fritz!Box creates
+    // both landevice* and user* entries). Send all UIDs so the server unblocks them all.
+    const uids = [uid];
+    if (!block) {
+      const device = state.filters?.devices?.find(d => d.uid === uid);
+      if (device) {
+        const duplicates = state.filters.devices.filter(d => d.name === device.name && d.uid !== uid && d.blocked);
+        uids.push(...duplicates.map(d => d.uid));
+      }
+    }
+
+    const deviceName = state.filters?.devices?.find(d => d.uid === uid)?.name;
+    await api('POST', API.FILTERS_BLOCK, { uids, blocked: block, name: deviceName });
+
+    // Update local state for all affected UIDs
+    for (const id of uids) {
+      const device = state.filters?.devices?.find(d => d.uid === id);
+      if (device) {
+        device.blocked = block;
+        device.usage = block ? 'Device block enabled' : 'Unrestricted';
+      }
     }
     showToast(`Appareil ${block ? 'bloqué' : 'débloqué'}`, 'success');
     renderFilters();
