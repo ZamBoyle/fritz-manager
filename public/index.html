@@ -65,7 +65,6 @@
             <button class="filter-btn active" data-filter="all">Tous</button>
             <button class="filter-btn" data-filter="favorites">Favoris</button>
             <button class="filter-btn" data-filter="online">En ligne</button>
-            <button class="filter-btn" data-filter="blocked">Bloqués</button>
           </div>
           <button class="btn-purge" onclick="removeAllOffline()">Supprimer les hors ligne</button>
         </div>
@@ -77,12 +76,12 @@
       <!-- Parental Controls Tab -->
       <section id="tab-filters" class="tab-content">
         <div class="sub-tabs">
-          <button class="sub-tab active" data-subtab="profiles" onclick="switchFilterSubTab('profiles')">Profils</button>
-          <button class="sub-tab" data-subtab="devices" onclick="switchFilterSubTab('devices')">Appareils</button>
+          <button class="sub-tab active" data-subtab="devices" onclick="switchFilterSubTab('devices')">Appareils</button>
+          <button class="sub-tab" data-subtab="profiles" onclick="switchFilterSubTab('profiles')">Profils</button>
         </div>
 
         <!-- Profiles Sub-View -->
-        <div id="subtab-profiles" class="subtab-content active">
+        <div id="subtab-profiles" class="subtab-content">
           <div class="toolbar">
             <button class="btn-create-profile" onclick="openProfileEditor()">+ Nouveau profil</button>
           </div>
@@ -91,8 +90,8 @@
           </div>
         </div>
 
-        <!-- Devices Sub-View (existing) -->
-        <div id="subtab-devices" class="subtab-content">
+        <!-- Devices Sub-View -->
+        <div id="subtab-devices" class="subtab-content active">
           <div class="toolbar">
             <div class="search-box">
               <input type="text" id="filter-search" placeholder="Rechercher un appareil..." aria-label="Rechercher un appareil">

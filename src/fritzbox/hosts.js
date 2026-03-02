@@ -132,7 +132,7 @@ class FritzHosts {
       const hostArray = Array.isArray(items) ? items : [items];
 
       const hosts = hostArray.map(item => ({
-        hostname: item.HostName || '',
+        hostname: item['X_AVM-DE_FriendlyName'] || item.HostName || '',
         ip: item.IPAddress || '',
         mac: item.MACAddress || '',
         active: item.Active === '1',

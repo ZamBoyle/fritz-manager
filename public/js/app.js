@@ -13,9 +13,6 @@ const API = {
   LOGIN: '/api/login',
   LOGOUT: '/api/logout',
   DEVICES: '/api/devices',
-  DEVICE_STATUS: (ip) => `/api/devices/${encodeURIComponent(ip)}/status`,
-  DEVICE_BLOCK: (ip) => `/api/devices/${encodeURIComponent(ip)}/block`,
-  DEVICE_UNBLOCK: (ip) => `/api/devices/${encodeURIComponent(ip)}/unblock`,
   DEVICES_CLEANUP: '/api/devices/cleanup',
   DEVICES_REMOVE: '/api/devices/remove',
   FAVORITES: '/api/favorites',
@@ -143,7 +140,7 @@ document.getElementById('refresh-btn').addEventListener('click', () => {
   if (activeTab === 'devices') loadDevices();
   if (activeTab === 'filters') {
     const activeSubTab = document.querySelector('.sub-tab.active')?.dataset.subtab;
-    if (activeSubTab === 'devices') loadFilters();
+    if (activeSubTab === 'devices') loadFilters(true);
     else loadProfiles();
   }
   if (activeTab === 'monitor') loadMonitorData();

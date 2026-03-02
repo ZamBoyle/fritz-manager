@@ -2,8 +2,6 @@
 'use strict';
 
 let currentFilter = 'all';
-let _wanAbortController = null;
-
 // === Favorites (server-side) ===
 let _favorites = new Set();
 
@@ -49,33 +47,15 @@ async function loadDevices() {
     const [data] = await Promise.all([api('GET', API.DEVICES), loadFavorites()]);
     state.devices = data.devices;
     renderDevices();
-
-    // Load WAN access status in background for active devices
-    loadWanStatusInBackground();
   } catch (err) {
     container.innerHTML = `<div class="empty-state">Erreur : ${escapeHtml(err.message)}</div>`;
   }
 }
 
-async function loadWanStatusInBackground() {
-  if (_wanAbortController) _wanAbortController.abort();
-  _wanAbortController = new AbortController();
-  const signal = _wanAbortController.signal;
-
-  const activeDevices = state.devices.filter(d => d.active && d.ip);
-  for (const device of activeDevices) {
-    try {
-      const res = await fetch(API.DEVICE_STATUS(device.ip), { signal });
-      const data = await res.json();
-      if (data.success) {
-        device.blocked = data.blocked;
-      }
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-      // ignore other errors
-    }
-  }
-  renderDevices();
+function isDeviceBlocked(device) {
+  const filters = state.filters?.devices;
+  if (!filters) return false;
+  return filters.some(d => d.name === device.hostname && d.blocked);
 }
 
 function renderDevices() {
@@ -96,8 +76,6 @@ function renderDevices() {
   // Apply filter
   if (currentFilter === 'online') {
     filtered = filtered.filter(d => d.active);
-  } else if (currentFilter === 'blocked') {
-    filtered = filtered.filter(d => d.blocked);
   } else if (currentFilter === 'favorites') {
     filtered = filtered.filter(d => isFavorite(d.mac));
   }
@@ -120,7 +98,7 @@ function renderDevices() {
   container.innerHTML = filtered.map(device => {
     const statusClass = device.active ? 'online' : 'offline';
     const fav = isFavorite(device.mac);
-    const cardClass = `device-card${device.blocked ? ' blocked' : ''}${!device.active ? ' offline' : ''}${fav ? ' favorite' : ''}`;
+    const cardClass = `device-card${!device.active ? ' offline' : ''}${fav ? ' favorite' : ''}`;
     const connType = device.interfaceType === 'Ethernet' ? 'Ethernet' :
                      device.interfaceType === '802.11' ? 'Wi-Fi' :
                      device.interfaceType || '?';
@@ -138,35 +116,17 @@ function renderDevices() {
             <span>MAC: ${escapeHtml(device.mac)}</span>
             <span>${escapeHtml(connType)}</span>
             ${device.speed && device.speed !== '0' ? `<span>${device.speed} Mbit/s</span>` : ''}
-            ${device.blocked ? '<span style="color:var(--danger)">BLOQUE</span>' : ''}
+            ${isDeviceBlocked(device) ? '<span style="color:var(--danger)">BLOQUÉ</span>' : ''}
           </div>
           ${!device.active && device.lastSeen ? `<div class="last-seen">Vu: ${formatLastSeen(device.lastSeen)}</div>` : ''}
         </div>
         <div class="device-actions">
-          ${device.active && device.ip ? (
-            device.blocked
-              ? `<button class="btn-unblock" onclick="unblockDevice('${escapeAttr(device.ip)}')">Débloquer</button>`
-              : `<button class="btn-block" onclick="blockDevice('${escapeAttr(device.ip)}')">Bloquer</button>`
-          ) : ''}
           ${!device.active ? `<button class="btn-remove" onclick="removeDevice('${escapeAttr(device.hostname || device.ip)}', '${escapeAttr(device.mac)}')">Supprimer</button>` : ''}
         </div>
       </div>
     `;
   }).join('');
 }
-
-async function setDeviceBlocked(ip, block) {
-  const selector = block ? '.btn-block' : '.btn-unblock';
-  const btn = document.querySelector(`[data-ip="${ip}"] ${selector}`);
-  await withBtnGuard(btn, async () => {
-    await api('POST', block ? API.DEVICE_BLOCK(ip) : API.DEVICE_UNBLOCK(ip));
-    showToast(`Appareil ${ip} ${block ? 'bloqué' : 'débloqué'}`, 'success');
-    await loadDevices();
-  });
-}
-
-function blockDevice(ip) { return setDeviceBlocked(ip, true); }
-function unblockDevice(ip) { return setDeviceBlocked(ip, false); }
 
 function formatLastSeen(ts) {
   const diff = Date.now() - ts;
@@ -259,8 +219,6 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 window.escapeHtml = escapeHtml;
 window.escapeAttr = escapeAttr;
 window.loadDevices = loadDevices;
-window.blockDevice = blockDevice;
-window.unblockDevice = unblockDevice;
 window.removeDevice = removeDevice;
 window.removeAllOffline = removeAllOffline;
 window.toggleFavorite = toggleFavorite;

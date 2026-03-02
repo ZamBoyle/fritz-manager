@@ -107,8 +107,13 @@ async function toggleKidBlock(uid, block) {
   const btn = card?.querySelector('.btn-block, .btn-unblock');
   await withBtnGuard(btn, async () => {
     await api('POST', API.FILTERS_BLOCK, { uid, blocked: block });
+    const device = state.filters?.devices?.find(d => d.uid === uid);
+    if (device) {
+      device.blocked = block;
+      device.usage = block ? 'Device block enabled' : 'Unrestricted';
+    }
     showToast(`Appareil ${block ? 'bloqué' : 'débloqué'}`, 'success');
-    await loadFilters(true);
+    renderFilters();
   });
 }
 
