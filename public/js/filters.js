@@ -118,8 +118,14 @@ async function changeProfile(uid, profileId) {
   _changeProfilePending = true;
   try {
     await api('POST', API.FILTERS_PROFILE, { uid, profileId });
+    // Update local state instead of reloading everything
+    const device = state.filters?.devices?.find(d => d.uid === uid);
+    if (device) {
+      const profile = state.filters.profiles?.find(p => p.id === profileId);
+      device.profileId = profileId;
+      device.profileName = profile?.name || profileId;
+    }
     showToast('Profil modifié', 'success');
-    await loadFilters(true);
   } catch (err) {
     showToast(`Erreur: ${err.message}`, 'error');
     await loadFilters(true);
